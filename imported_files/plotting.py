@@ -238,4 +238,4 @@ def plotTimeSinceMergerDist(scale_merger_AGN, scale_merger_gal, pos_z_AGN, pos_z
     
     ax.set_xscale("log")
     plt.savefig('figures/t_since_merger_distribution_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
-    return
+    return ax
