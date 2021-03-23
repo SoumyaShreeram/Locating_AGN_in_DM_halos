@@ -12,13 +12,22 @@ The notebook is divided into the following sections:
 **Date**: 23rd February 2021
 """
 
-# import required packages
-
+# astropy modules
 import astropy.units as u
 import astropy.io.fits as fits
 from astropy.table import Table, Column
-import os
+from astropy.coordinates import SkyCoord
+from astropy.cosmology import FlatLambdaCDM, z_at_value
+
 import numpy as np
+
+# system imports
+import os
+import sys
+
+# scipy modules
+from scipy.spatial import KDTree
+from scipy.interpolate import interp1d
 """
 
 1. Functions for loading data
@@ -71,7 +80,10 @@ def getAgnData(hd_agn, agn_FX_soft, redshift_limit):
     dec_AGN = hd_agn['DEC'][downsample_agn]
     z_AGN = hd_agn['redshift_R'][downsample_agn]
     pos_z = [ra_AGN, dec_AGN, z_AGN]
-    return pos_z
+    
+    # scale factor of last major merger
+    scale_merger = hd_agn['HALO_scale_of_last_MM'][downsample_agn]
+    return pos_z, scale_merger
 
 def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit):
     """
@@ -85,31 +97,60 @@ def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit):
     dec_gal = hd_gal['DEC'][downsample_gal]
     z_gal = hd_gal['redshift_R'][downsample_gal]
     pos_z = [ra_gal, dec_gal, z_gal]
-    return pos_z
+    
+    # scale factor of last major merger
+    scale_merger = hd_gal['HALO_scale_of_last_MM'][downsample_gal]
+    return pos_z, scale_merger
 
 def getHaloData(hd_halo, cluster_params, redshift_limit):
     """
     Function to get relavant data for halos that can be classified as clusters
     @hd_halo :: table with all relevant info on halos, clusters, and galaxies within them
-    @min_cluster_mass :: minimum mass for a halo to be classified as a cluster (solar masses)
+    @cluster_params :: contains the minimum mass for a central halo to be classified as a cluster (solar masses)
+    @redshift_limit :: limit upto which the objects are chosen
     """
     min_cluster_mass = cluster_params[0]
     
-    # select halos with cuts in Fx, BCG mag_r, M_vir, and z
-    mass_z_condition = (hd_halo['HALO_M500c']>min_cluster_mass) & (hd_halo['redshift_R']<redshift_limit)
+    # selection conditions for halos
+    redshift_condition = (hd_halo['redshift_R']<redshift_limit) 
+    cen_halo_condition = (hd_halo['HALO_M500c']>min_cluster_mass) & (hd_halo['HALO_pid']==-1)
+    sat_halo_condition = (hd_halo['HALO_pid']!=-1)
     
-    downsample_halo = mass_z_condition
+    # downsample based on central/sattelite-halo information
+    cen = redshift_condition & cen_halo_condition
+    sat = redshift_condition & sat_halo_condition
+      
+    # ra for cen and sat halos
+    ra_cen = hd_halo['RA'][cen]
+    ra_sat = hd_halo['RA'][sat]
     
-    # get the ra, dec and z for all the halos
-    ra_halo = hd_halo['RA'][downsample_halo]
-    dec_halo = hd_halo['DEC'][downsample_halo]
-    z_halo = hd_halo['redshift_R'][downsample_halo]
-    pos_z = [ra_halo, dec_halo, z_halo]  
+    # dec for cen and sat halos
+    dec_cen = hd_halo['DEC'][cen]
+    dec_sat = hd_halo['DEC'][sat]
     
-    return pos_z, downsample_halo
+    # redshift for cen and sat halos
+    z_cen = hd_halo['redshift_R'][cen]
+    z_sat = hd_halo['redshift_R'][sat]
+        
+    pos_z_cen = [ra_cen, dec_cen, z_cen]
+    pos_z_sat = [ra_sat, dec_sat, z_sat]
+    return pos_z_cen, pos_z_sat
 
-def concatenateObjs(arr1, arr2, arr3):
-    return np.concatenate((np.array(arr1), np.array(arr2), np.array(arr3)), axis=None)
+def concatenateObjs(arr0, arr1, arr2):
+    "Function to concatenate 3 arrays"
+    return np.concatenate((np.array(arr0), np.array(arr1), np.array(arr2)), axis=None)
+
+def concatMultipleArrays(arr, num_arrays):
+    "Function to concatenate multiple 3-arrays' simultaneously"
+    if num_arrays == 3:
+        arr0, arr1, arr2 = arr[0], arr[1], arr[2]
+        
+        concat_arr0 = concatenateObjs(arr0[0], arr1[0], arr2[0])
+        concat_arr1 = concatenateObjs(arr0[1], arr1[1], arr2[1])
+        concat_arr2 = concatenateObjs(arr0[2], arr1[2], arr2[2]) 
+    else:
+        "Concatenation not yet developed: look up or do them separately"
+    return concat_arr0, concat_arr1, concat_arr2
 
 def getClusterPositionsRedshift(hd_halo0, hd_halo1, hd_halo2, cluster_params, redshift_limit):
     """
@@ -122,63 +163,56 @@ def getClusterPositionsRedshift(hd_halo0, hd_halo1, hd_halo2, cluster_params, re
     @Returns :: pos_z_clu :: [ra, dec, redshift] of all the clusters in the 3 files
     """
     # get positions and redshift of all the selected clusters
-    pos_z_clu0, _ = getHaloData(hd_halo0, cluster_params, redshift_limit)
-    pos_z_clu1, _ = getHaloData(hd_halo1, cluster_params, redshift_limit)
-    pos_z_clu2, _ = getHaloData(hd_halo1, cluster_params, redshift_limit)
+    pos_z_cen0, pos_z_sat0 = getHaloData(hd_halo0, cluster_params, redshift_limit)
+    pos_z_cen1, pos_z_sat1 = getHaloData(hd_halo1, cluster_params, redshift_limit)
+    pos_z_cen2, pos_z_sat2 = getHaloData(hd_halo2, cluster_params, redshift_limit)
     
-    # concatenates the ra, dec, and z for the clusters
-    ra_clu = concatenateObjs(pos_z_clu0[0], pos_z_clu1[0], pos_z_clu2[0])
-    dec_clu = concatenateObjs(pos_z_clu0[1], pos_z_clu1[1], pos_z_clu2[1])
-    z_clu = concatenateObjs(pos_z_clu0[2], pos_z_clu1[2], pos_z_clu2[2]) 
+    # concatenates the ra, dec, and z for the central clusters
+    ra_cen_clu, dec_cen_clu, z_cen_clu = concatMultipleArrays([pos_z_cen0, pos_z_cen1, pos_z_cen2], num_arrays = 3)
+    
+    # concatenates the ra, dec, and z for the sub clusters
+    ra_sat_clu, dec_sat_clu, z_sat_clu = concatMultipleArrays([pos_z_sat0, pos_z_sat1, pos_z_sat2], num_arrays = 3)
 
-    pos_z_clu = [ra_clu, dec_clu, z_clu]
-    return pos_z_clu
+    pos_z_cen = [ra_cen_clu, dec_cen_clu, z_cen_clu]
+    pos_z_sat = [ra_sat_clu, dec_sat_clu, z_sat_clu ]
+    return pos_z_cen, pos_z_sat
 
-def getHostSatHalos(hd_halo, cluster_params, redshift_limit):
+def findPairs(pos_z_AGN, redshift_bins):
     """
-    Function to get the position of central and satellite halos
-    @hd_halo :: table with all relevant info on halos, clusters, and galaxies within them
-    @cluster_params :: contains clu_FX_soft, galaxy_mag_r, min_cluster_mass where
-        @min_cluster_mass :: min mass for halo to be called a cluster
-    @redshift_limit :: upper limit on redshift
+    Function to find agn pairs
     """
-    # get positions and redshift of all the selected clusters
-    _, downsample_halo = getHaloData(hd_halo, cluster_params, redshift_limit)
+    ra_agn, dec_agn, z_agn = pos_z_AGN[0], pos_z_AGN[1], pos_z_AGN[2]
     
-    # get central and sub halo related data
-    cen = (hd_halo[downsample_halo]['HALO_pid']==-1)
-    sat = (cen == False)
-    
-    # ra and dec for cen and sat halos
-    ra_cen = hd_halo['RA'][cen]
-    ra_sat = hd_halo['RA'][sat]
-    
-    dec_cen = hd_halo['DEC'][cen]
-    dec_sat = hd_halo['DEC'][sat]
-    
-    pos_cen = [ra_cen, dec_cen]
-    pos_sat = [ra_sat, dec_sat]
-    return pos_cen, pos_sat
+    # bin galaxies in the same redshift range
+    for i, z in enumerate(redshift_bins):
+        if i == 0:
+            group = np.where((z_agn>=0) & (z_agn<z))[0]
+        else:
+            group = np.where((z_agn>=redshift_bins[i-1]) & (z_agn<z))[0]
+        pos = np.array([ra_agn[group], dec_agn[group]])
+        
+        kd_tree = KDTree(pos)
+        pairs = kd_tree.query_pairs(r=1.2)
+        print(len(list(pairs)))
+    return pos
 
-def getPositionsHostSatHalos(hd_halo0, hd_halo1, hd_halo2, cluster_params, redshift_limit):
+def scaleFactorToRedshift(a):
+    "Function to convert the scale factor to redshift"
+    return 1/a - 1
+
+def getMergerTimeDifference(merger_val, redshifts, cosmo):
     """
-    Function to concatenate the positions of the halo files
-    @hd_halo :: table with all relevant info on halos, clusters, and galaxies within them 
-    --> divided into 3 because each hd_halo holds info on 1000 halos alone
-    @cluster_params :: contains clu_FX_soft, galaxy_mag_r, min_cluster_mass where
-        @min_cluster_mass :: min mass for halo to be called a cluster
-    @redshift_limit :: upper limit on redshift
+    Function to calculate the time difference between the merger time and current time
+    @merger_val :: scale factor of the merged object
+    @cosmo :: cosmology used for the calculation
     """
-    pos_cen0, pos_sat0 = getHostSatHalos(hd_halo0, cluster_params, redshift_limit)
-    pos_cen1, pos_sat1 = getHostSatHalos(hd_halo1, cluster_params, redshift_limit)
-    pos_cen2, pos_sat2 = getHostSatHalos(hd_halo2, cluster_params, redshift_limit)
+    # convert the merger scale factor into redshift
+    merger_z = [z_at_value(cosmo.scale_factor, a) for a in merger_val]
     
+    # convert the merger & current redshifts into lookback time
+    merger_time = cosmo.lookback_time(merger_z)
+    current_time = cosmo.lookback_time(redshifts)
     
-    # concatenates the ra, dec for central halos
-    ra_cen = concatenateObjs(pos_cen0[0], pos_cen1[0], pos_cen2[0])
-    dec_cen = concatenateObjs(pos_cen0[1], pos_cen1[1], pos_cen2[1])
-    
-    # concatenates the ra, dec for satellite halos
-    ra_sat = concatenateObjs(pos_sat0[0], pos_sat1[0], pos_sat2[0])    
-    dec_sat = concatenateObjs(pos_sat0[1], pos_sat1[1], pos_sat2[1])  
-    return ra_cen, dec_cen, ra_sat, dec_sat
+    # difference in lookback time between the merger and AGN redshift
+    diff_time = merger_time-current_time
+    return diff_time
