@@ -62,7 +62,7 @@ def getFilename(look_dir, pixel_no):
     filename = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS', 'fixedAmp_InvPhase_001', dir_name, pixel_file)
     return filename
 
-def getAgnData(hd_agn, agn_FX_soft, redshift_limit, cen_halo_condition, sat_halo_condition):
+def getAgnData(hd_agn, agn_FX_soft, redshift_limit):
     """
     Function to get the relavant data for AGNs
     @hd_agn :: table file with all relevant info on AGNs
@@ -86,7 +86,7 @@ def getAgnData(hd_agn, agn_FX_soft, redshift_limit, cen_halo_condition, sat_halo
     
     return pos_z, scale_merger, downsample_agn
 
-def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit, cen_halo_condition, sat_halo_condition):
+def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit):
     """
     Function to get relavant data for galaxies
     
@@ -136,7 +136,7 @@ def getHaloData(hd_halo, cluster_params, redshift_limit):
         
     pos_z_cen = [ra_cen, dec_cen, z_cen]
     pos_z_sat = [ra_sat, dec_sat, z_sat]
-    return pos_z_cen, pos_z_sat, redshift_condition, cen_halo_condition, sat_halo_condition
+    return pos_z_cen, pos_z_sat
 
 def concatenateObjs(arr0, arr1, arr2):
     "Function to concatenate 3 arrays"
@@ -165,9 +165,9 @@ def getClusterPositionsRedshift(hd_halo0, hd_halo1, hd_halo2, cluster_params, re
     @Returns :: pos_z_clu :: [ra, dec, redshift] of all the clusters in the 3 files
     """
     # get positions and redshift of all the selected clusters
-    pos_z_cen0, pos_z_sat0, z_cond, cen_halo_cond, sat_halo_cond = getHaloData(hd_halo0, cluster_params, redshift_limit)
-    pos_z_cen1, pos_z_sat1, _, _, _ = getHaloData(hd_halo1, cluster_params, redshift_limit)
-    pos_z_cen2, pos_z_sat2, _, _, _ = getHaloData(hd_halo2, cluster_params, redshift_limit)
+    pos_z_cen0, pos_z_sat0 = getHaloData(hd_halo0, cluster_params, redshift_limit)
+    pos_z_cen1, pos_z_sat1 = getHaloData(hd_halo1, cluster_params, redshift_limit)
+    pos_z_cen2, pos_z_sat2 = getHaloData(hd_halo2, cluster_params, redshift_limit)
     
     # concatenates the ra, dec, and z for the central clusters
     ra_cen_clu, dec_cen_clu, z_cen_clu = concatMultipleArrays([pos_z_cen0, pos_z_cen1, pos_z_cen2], num_arrays = 3)
@@ -177,7 +177,7 @@ def getClusterPositionsRedshift(hd_halo0, hd_halo1, hd_halo2, cluster_params, re
 
     pos_z_cen = [ra_cen_clu, dec_cen_clu, z_cen_clu]
     pos_z_sat = [ra_sat_clu, dec_sat_clu, z_sat_clu ]
-    return pos_z_cen, pos_z_sat, [z_cond, cen_halo_cond, sat_halo_cond]
+    return pos_z_cen, pos_z_sat
 
 def getMergerTimeDifference(merger_val, redshifts, cosmo):
     """
@@ -196,13 +196,13 @@ def getMergerTimeDifference(merger_val, redshifts, cosmo):
     diff_time = merger_time-current_time
     return diff_time
 
-def mergersOfCenSatObjects(conditions_obj, hd_obj, min_cluster_mass):
+def cenSatObjects(conditions_obj, hd_obj, min_cluster_mass):
     "Function to obtain the merger rates of central and sattelite objects"
     # conditions
-    cen = np.where(hd_obj[conditions_obj] and hd_obj['HALO_pid'==-1][0] and hd_obj['HALO_M500c']>min_cluster_mass)[0]
-    sat = np.where(hd_obj[conditions_obj] and hd_obj['HALO_pid'!=-1])[0] 
+    cen = conditions_obj & (hd_obj['HALO_pid'] == -1) & (hd_obj['HALO_M500c']>min_cluster_mass)
+    sat = conditions_obj & (hd_obj['HALO_pid'] != -1)
     
     # arrays
-    scale_merger_cobj = hd_obj[cen]
-    scale_merger_sobj = hd_obj[sat]
-    return [scale_merger_cobj, scale_merger_sobj]
+    cen_obj = hd_obj[cen]
+    sat_obj = hd_obj[sat]
+    return [cen_obj, sat_obj]

@@ -215,27 +215,60 @@ def plotMergerDistribution(merger_val_gal, counts_gal, merger_val_agn, counts_ag
     plt.savefig('figures/merger_distribution_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
     return 
 
-def plotTimeSinceMergerDist(scale_merger_AGN, scale_merger_gal, pos_z_AGN, pos_z_gal, cosmo, bin_size, redshift_limit):
+
+def plotCentralSatelliteScaleMergers(cen_sat_AGN, cen_sat_gal, redshift_limit):
+    """
+    Function to plot the central and sattelite scale factors for mergers
+    
+    """
+    fig, ax = plt.subplots(1,1,figsize=(7,6))
+
+    labels = [r'central AGNs', r'sat AGNs', 'central Galaxies', 'sat Galaxies']
+    c, m, ms = ['grey', 'k', '#a4bdeb', 'b'], ['^', '*', '^', '*'], [9, 4, 4, 8]
+
+    for i in [1, 0]:
+        s_m_agn, c_agn = np.unique(cen_sat_AGN[i]['HALO_scale_of_last_MM'], return_counts=True)
+        s_m_gal, c_gal = np.unique(cen_sat_gal[i]['HALO_scale_of_last_MM'], return_counts=True)
+
+        ax.plot(s_m_agn, c_agn, color=c[i], marker=m[i], ls='', ms=ms[i], label=labels[i])
+        ax.plot(s_m_gal, c_gal, color=c[i+2], marker=m[i], ls='', ms=ms[i+2], label=labels[i+2])
+        setLabel(ax, r'Scale, $a(t)$, of last Major Merger', 'Counts', '', 'default', 'default', legend=True)
+
+        ax.set_yscale("log")
+
+    plt.savefig('figures/merger_dist_cenAndsat_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
+    print('Objects below z: ', redshift_limit)
+    return
+
+
+def plotTimeSinceMergerDist(scale_merger_AGN, scale_merger_gal, z_AGN, z_gal, cosmo, bin_size, redshift_limit):
     """
     Plot the distribution of halos with respective galaxies & agns given the time since merger
     """
     # get the time difference since merger events in the halos
-    t_merger_agn = edh.getMergerTimeDifference(scale_merger_AGN, pos_z_AGN[2], cosmo)
-    t_merger_gal = edh.getMergerTimeDifference(scale_merger_gal, pos_z_gal[2], cosmo)
+    t_merger_agn = edh.getMergerTimeDifference(scale_merger_AGN, z_AGN, cosmo)
+    t_merger_gal = edh.getMergerTimeDifference(scale_merger_gal, z_gal, cosmo)
 
     # get the t since merger bins and counts
-    t_merger_bins_agn, counts_t_merger_agn = np.histogram(t_merger_agn, bins = bin_size)
-    t_merger_bins_gal, counts_t_merger_gal = np.histogram(t_merger_gal, bins = bin_size)
+    if bin_size[0]:
+        c_t_agn, merger_bins_agn = np.histogram(np.array(t_merger_agn), bins = bin_size)
+        c_t_gal, merger_bins_gal = np.histogram(np.array(t_merger_gal), bins = bin_size)
+        merger_bins_agn = merger_bins_agn[:-1]
+        merger_bins_gal = merger_bins_gal[:-1]
+        
+    else:
+        merger_bins_agn, c_t_agn = np.unique(t_merger_agn, return_counts=True)
+        merger_bins_gal, c_t_gal = np.unique(t_merger_gal, return_counts=True)
 
     fig, ax = plt.subplots(1,1,figsize=(7,6))
 
     # plot the time since merger distribution for galaxies and agns
-    ax.plot(t_merger_bins_gal, np.cumsum(counts_t_merger_gal[:-1]), 'b^', label='Galaxies', ms=4) 
-    ax.plot(t_merger_bins_agn, np.cumsum(counts_t_merger_agn[:-1]), 'k^', label='AGNs', ms=4) 
-
+    ax.plot(merger_bins_gal, np.cumsum(c_t_gal), 'k^', label='Galaxies', ms=4) 
+    ax.plot(merger_bins_agn, np.cumsum(c_t_agn), 'b^', label='AGNs', ms=4) 
+    
     # set labels/legends
     setLabel(ax, r'$\Delta t_{merger} = t(z_{merger})-t(z=0)$ [Gyr]', 'Cumulative counts', '', 'default', 'default', legend=True)
     
-    ax.set_xscale("log")
-    plt.savefig('figures/t_since_merger_distribution_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
+    ax.set_yscale("log")
+    plt.savefig('figures/t_since_merger_cen_dist_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
     return ax
