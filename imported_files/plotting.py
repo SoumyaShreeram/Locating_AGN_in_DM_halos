@@ -143,8 +143,8 @@ def plotAGNfraction(pos_z_clu, pos_z_AGN, pos_z_gal, redshift_limit_agn, bin_siz
     counts_gal, redshift_bins_gal = np.histogram(pos_z_gal[2], bins = bin_size)
     
     # plotting the galaxy and agn distribution as a function of redshift    
-    ax[0].plot(redshift_bins_gal[1:], counts_gal, 'bs', ms=4, label=r'Galaxies')
-    ax[0].plot(redshift_bins_agn[1:], counts_agn, 'ks', ms=4, label=r'AGNs')
+    ax[0].plot(redshift_bins_gal[1:], counts_gal, 'ks', ms=4, label=r'Galaxies')
+    ax[0].plot(redshift_bins_agn[1:], counts_agn, 'bs', ms=4, label=r'AGNs')
     
     # axis properties - 0
     xlim = [np.min(redshift_bins_agn[1:]), np.max(redshift_bins_agn[1:])]
@@ -160,7 +160,7 @@ def plotAGNfraction(pos_z_clu, pos_z_AGN, pos_z_gal, redshift_limit_agn, bin_siz
     z_bin_modified = redshift_bins_gal[1:][np.array(idx)]
     
     # plot agn fraction
-    ax[1].plot(z_bin_modified, f_agn, 'rs', ms=4, label=r'$z<%.2f$'%redshift_limit_agn)
+    ax[1].plot(z_bin_modified, f_agn, 's', color='#6b0385', ms=4, label=r'$z<%.2f$'%redshift_limit_agn)
     
     # axis properties - 1
     xlim = [np.min(redshift_bins_agn[1:])-0.02, np.max(redshift_bins_agn[1:])]
@@ -198,8 +198,8 @@ def plotMergerDistribution(merger_val_gal, counts_gal, merger_val_agn, counts_ag
     ax2 = ax1.twiny()
     
     # plot the merger distribution for galaxies and agns
-    ax1.plot(merger_val_gal, counts_gal, 'bx', label='Galaxies') 
-    ax1.plot(merger_val_agn, counts_agn, 'kx', label='AGNs') 
+    ax1.plot(merger_val_gal, counts_gal, 'kx', label='Galaxies') 
+    ax1.plot(merger_val_agn, counts_agn, 'bx', label='AGNs') 
 
     setLabel(ax1, r'Scale, $a(t)$, of last Major Merger', 'Counts', '', 'default', 'default', legend=True)
     ax.set_yscale("log")
@@ -224,7 +224,7 @@ def plotCentralSatelliteScaleMergers(cen_sat_AGN, cen_sat_gal, redshift_limit):
     fig, ax = plt.subplots(1,1,figsize=(7,6))
 
     labels = [r'central AGNs', r'sat AGNs', 'central Galaxies', 'sat Galaxies']
-    c, m, ms = ['grey', 'k', '#a4bdeb', 'b'], ['^', '*', '^', '*'], [9, 4, 4, 8]
+    c, m, ms = ['#a4bdeb', 'b', 'grey', 'k'], ['^', '*', '^', '*'], [8, 4, 4, 8]
 
     for i in [1, 0]:
         s_m_agn, c_agn = np.unique(cen_sat_AGN[i]['HALO_scale_of_last_MM'], return_counts=True)
@@ -238,7 +238,7 @@ def plotCentralSatelliteScaleMergers(cen_sat_AGN, cen_sat_gal, redshift_limit):
 
     plt.savefig('figures/merger_dist_cenAndsat_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
     print('Objects below z: ', redshift_limit)
-    return
+    return [labels, c, m, ms]
 
 
 def plotTimeSinceMergerDist(scale_merger_AGN, scale_merger_gal, z_AGN, z_gal, cosmo, bin_size, redshift_limit):
@@ -267,8 +267,43 @@ def plotTimeSinceMergerDist(scale_merger_AGN, scale_merger_gal, z_AGN, z_gal, co
     ax.plot(merger_bins_agn, np.cumsum(c_t_agn), 'b^', label='AGNs', ms=4) 
     
     # set labels/legends
-    setLabel(ax, r'$\Delta t_{merger} = t(z_{merger})-t(z=0)$ [Gyr]', 'Cumulative counts', '', 'default', 'default', legend=True)
+    setLabel(ax, r'$\Delta t_{merger} = t(z_{merger})-t(z_{current})$ [Gyr]', 'Cumulative counts', '', 'default', 'default', legend=True)
     
     ax.set_yscale("log")
+    ax.set_xscale("log")
     plt.savefig('figures/t_since_merger_cen_dist_z%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')
+    return ax, t_merger_agn, t_merger_gal
+
+def mergerRedshiftPlot(cen_sat_AGN, cen_sat_gal, dt_m, plot_params, redshift_limit):
+    """
+    Function to plot the time since merger as a function of the redshift
+    @cen_sat_AGN(gal) :: handels to access the central and satellite AGNs(galaxies)
+    @dt_m :: time difference after merger for cen/sat AGNs(galaxies)
+    @plot_params :: to keep consistency between plots, array containing [labels, c, m, ms]
+    """
+    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    mec = ['w', 'w', 'grey', 'k']
+    plot_params[3][1] = 9
+    
+    z_R = [cen_sat_AGN[0]['redshift_R'], cen_sat_AGN[1]['redshift_R'], cen_sat_gal[0]['redshift_R'], cen_sat_gal[1]['redshift_R']]
+
+    for i in [3, 2, 1, 0]:
+        ax.plot(dt_m[i], z_R[i], plot_params[2][i], color=plot_params[1][i], ms=plot_params[3][i], markeredgecolor=mec[i], label=plot_params[0][i])
+    
+    # set labels/legends
+    setLabel(ax, r'$\Delta t_{merger} = t(z_{merger})-t(z_{current})$ [Gyr]', r'Redshift$_R$', '', 'default', 'default', legend=True)
+    ax.set_xscale("log")
+    plt.savefig('figures/t_since_merger_z_plot_%.2f.pdf'%redshift_limit, facecolor='w', edgecolor='w')    
     return ax
+
+def plotMergerTimeCuts(ax, t_merger_cut_arr, l):
+    """
+    Function to plot the defined cuts in merger times within the concerned plot
+    @t_merger_cut_arr :: array that defines the cuts in the merger times
+    @l :: array that defines the linestyles used to denote these cuts (refer to the initial codeblock in the notebook)
+    """
+    for i, t_m_cut in enumerate(t_merger_cut_arr):
+        ax.axvline(x=t_m_cut, color='r', linestyle= l[i], label='%.1f Gyr'%t_m_cut)
+
+    ax.legend(fontsize=14) 
+    return
