@@ -3,13 +3,13 @@
 
 This python file contains the function of the corresponding notebook '01_Exploring_DM_Haloes.ipynb'.
 
-The notebook is divided into the following sections:
-1. Loading data and defining input parameters
-2. Studying sizes of haloes and sub-haloes
+The script is divided into the following sections:
+1. Functions for loading data
+2. Functions to study mergers in the central and satellite object distributions
 
-**Script written by**: Soumya Shreeram <br>
-**Project supervised by**: Johan Comparat <br>
-**Date**: 23rd February 2021
+Script written by: Soumya Shreeram 
+Project supervised by Johan Comparat 
+Date created: 23rd February 2021
 """
 
 # astropy modules
@@ -24,10 +24,6 @@ import numpy as np
 # system imports
 import os
 import sys
-
-# scipy modules
-from scipy.spatial import KDTree
-from scipy.interpolate import interp1d
 """
 
 1. Functions for loading data
@@ -42,25 +38,53 @@ def getFilename(look_dir, pixel_no):
     Returns @filename :: the fullname of the chosen file directory
     """
     agn_dir = 'cat_AGN_all'
-    hp_dir = 'cat_eRO_CLU_b8_CM_0_pixS_20.0_galNH'
-    gal_dir = 'cat_GALAXY_all'
+    hp_dir = 'cat_GALAXY_all'
+    clu_dir = 'cat_eRO_CLU_b8_CM_0_pixS_20.0_galNH'
     
     # choose the directory of interest
     if look_dir == 'agn':
         dir_name = agn_dir
         pixel_file = pixel_no + '.fit'
         
-    if look_dir == 'galaxy':
-        dir_name = gal_dir
+    if look_dir == 'galaxy' or look_dir == 'halo':
+        dir_name = hp_dir
         pixel_file = pixel_no + '.fit'
         
-    if look_dir == 'halo':
-        dir_name = hp_dir
+    if look_dir == 'cluster':
+        dir_name = clu_dir
         pixel_file = 'c_'+ pixel_no[0] + '_N_%d.fit'%pixel_no[1]
     
     # set path
     filename = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS', 'fixedAmp_InvPhase_001', dir_name, pixel_file)
     return filename
+
+
+def getHeaders(pixel_no, obj, clu_files_no):
+    """
+    Function to get all the required headers to access simulation data
+    @pixel_no :: pixel number chosen to open simulation file
+    @obj :: objects whose headers you wish to open
+    @clu_files_no :: number of files into which the cluster data is divided into
+    
+    @Returns :: hd_all :: list containing all the header files
+    """
+    hd_agn, hd_halo, hd_clu = [], [], []
+    
+    if np.any(obj=='agn'):
+        agn_filename = getFilename('agn', pixel_no = pixel_no)
+        hd_agn = Table.read(agn_filename, format='fits') 
+                
+    if np.any(obj=='halo'):
+        halo_filename = getFilename('halo', pixel_no = pixel_no)
+        hd_halo = Table.read(halo_filename, format='fits')
+        
+    if np.any(obj=='cluster'):
+        hd_clu = []
+        for i in range(clu_files_no):
+            clu_filename = getFilename('cluster', pixel_no = [pixel_no, i])
+            hd_c = Table.read(clu_filename, format='fits')
+            hd_clu.append(hd_c)       
+    return hd_agn, hd_halo, hd_clu
 
 def getAgnData(hd_agn, agn_FX_soft, redshift_limit):
     """
@@ -91,8 +115,11 @@ def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit):
     Function to get relavant data for galaxies
     
     """
-    downsample_gal = (hd_gal['galaxy_SMHMR_mass']>galaxy_SMHMR_mass) & (hd_gal['redshift_R']<redshift_limit)
-    
+    if isinstance(galaxy_SMHMR_mass, (int, float)):
+        downsample_gal = (hd_gal['galaxy_SMHMR_mass']>galaxy_SMHMR_mass) & (hd_gal['redshift_R']<redshift_limit)
+    else:
+        downsample_gal = (hd_gal['redshift_R']<redshift_limit)
+        
     # get the ra, dec and z for the AGNs
     ra_gal = hd_gal['RA'][downsample_gal]
     dec_gal = hd_gal['DEC'][downsample_gal]
@@ -104,9 +131,9 @@ def getGalaxyData(hd_gal, galaxy_SMHMR_mass, redshift_limit):
     
     return pos_z, scale_merger, downsample_gal
 
-def getHaloData(hd_halo, cluster_params, redshift_limit):
+def getClusterData(hd_halo, cluster_params, redshift_limit):
     """
-    Function to get relavant data for halos that can be classified as clusters
+    Function to get relavant data for classified clusters 
     @hd_halo :: table with all relevant info on halos, clusters, and galaxies within them
     @cluster_params :: contains the minimum mass for a central halo to be classified as a cluster (solar masses)
     @redshift_limit :: limit upto which the objects are chosen
@@ -138,46 +165,61 @@ def getHaloData(hd_halo, cluster_params, redshift_limit):
     pos_z_sat = [ra_sat, dec_sat, z_sat]
     return pos_z_cen, pos_z_sat
 
-def concatenateObjs(arr0, arr1, arr2):
-    "Function to concatenate 3 arrays"
-    return np.concatenate((np.array(arr0), np.array(arr1), np.array(arr2)), axis=None)
+def concatMultipleArrays(pos_z_all, num_cluster_files):
+    """
+    Function to concatenate multiple 3-arrays' simultaneously
+    @pos_z_all :: positions and redshifts from all the cluster files
+    @num_cluster_files :: number of cluster files
+    """
+    ra, dec, z = [], [], []
+    for num_clu in range(num_cluster_files):
+        ra.append(pos_z_all[num_clu][0])
+        dec.append(pos_z_all[num_clu][1])
+        z.append(pos_z_all[num_clu][2])
+    
+    ra_all = np.concatenate(ra, axis=None)
+    dec_all = np.concatenate(dec, axis=None)
+    z_all = np.concatenate(z, axis=None)
+    return ra_all, dec_all, z_all
 
-def concatMultipleArrays(arr, num_arrays):
-    "Function to concatenate multiple 3-arrays' simultaneously"
-    if num_arrays == 3:
-        arr0, arr1, arr2 = arr[0], arr[1], arr[2]
-        
-        concat_arr0 = concatenateObjs(arr0[0], arr1[0], arr2[0])
-        concat_arr1 = concatenateObjs(arr0[1], arr1[1], arr2[1])
-        concat_arr2 = concatenateObjs(arr0[2], arr1[2], arr2[2]) 
-    else:
-        "Concatenation not yet developed: look up or do them separately"
-    return concat_arr0, concat_arr1, concat_arr2
 
-def getClusterPositionsRedshift(hd_halo0, hd_halo1, hd_halo2, cluster_params, redshift_limit):
+def getClusterPositionsRedshift(hd_clu, cluster_params, redshift_limit):
     """
     Function to get the positions and redshifts of the clusters that pass the required criterion
-    @hd_halo :: table with all relevant info on halos, clusters, and galaxies within them 
-    --> divided into 3 because each hd_halo holds info on 1000 halos alone
-    @cluster_params :: contains clu_FX_soft, galaxy_mag_r, min_cluster_mass where
-        @min_cluster_mass :: min mass for halo to be called a cluster
+    @hd_clu :: list of cluster headers (each header ahs info on 1000 clusters alone)
+    @cluster_params :: contains halo_mass_500c and central_Mvir
     @redshift_limit :: upper limit on redshift
     @Returns :: pos_z_clu :: [ra, dec, redshift] of all the clusters in the 3 files
     """
-    # get positions and redshift of all the selected clusters
-    pos_z_cen0, pos_z_sat0 = getHaloData(hd_halo0, cluster_params, redshift_limit)
-    pos_z_cen1, pos_z_sat1 = getHaloData(hd_halo1, cluster_params, redshift_limit)
-    pos_z_cen2, pos_z_sat2 = getHaloData(hd_halo2, cluster_params, redshift_limit)
+    pos_z_cen_all, pos_z_sat_all = [], []
     
+    for i in range(len(hd_clu)):
+        # get positions and redshift of all the selected clusters
+        pos_z_cen, pos_z_sat = getClusterData(hd_clu[i], cluster_params, redshift_limit)
+        pos_z_cen_all.append(pos_z_cen)
+        pos_z_sat_all.append(pos_z_sat)
+        
     # concatenates the ra, dec, and z for the central clusters
-    ra_cen_clu, dec_cen_clu, z_cen_clu = concatMultipleArrays([pos_z_cen0, pos_z_cen1, pos_z_cen2], num_arrays = 3)
-    
-    # concatenates the ra, dec, and z for the sub clusters
-    ra_sat_clu, dec_sat_clu, z_sat_clu = concatMultipleArrays([pos_z_sat0, pos_z_sat1, pos_z_sat2], num_arrays = 3)
+    pos_z_cen_clu = concatMultipleArrays(pos_z_cen_all, len(hd_clu))
+    pos_z_sat_clu = concatMultipleArrays(pos_z_sat_all, len(hd_clu))
+    return pos_z_cen_clu, pos_z_sat_clu
 
-    pos_z_cen = [ra_cen_clu, dec_cen_clu, z_cen_clu]
-    pos_z_sat = [ra_sat_clu, dec_sat_clu, z_sat_clu ]
-    return pos_z_cen, pos_z_sat
+
+def printNumberOfObjects(pos_z_AGN, pos_z_cen_clu, pos_z_sat_clu, pos_z_gal, pos_z_halo):
+    """
+    Function to print total number of objects in the chosen pixel file
+    """
+    print('AGNs/haloes in the pixel are in z = %.2f to %.2f'%(np.min(pos_z_AGN[2]), np.max(pos_z_AGN[2])))
+    num_total_clusters = len(pos_z_cen_clu[2]) + len(pos_z_sat_clu[2])
+    
+    print('%d DM halos, %d clusters, %d AGNs, %d galaxies'%(len(pos_z_halo[0]), num_total_clusters, len(pos_z_AGN[2]), len(pos_z_gal[0])))
+    return
+
+"""
+
+Functions to study mergers in the central and satellite object distributions
+
+"""
 
 def getMergerTimeDifference(merger_val, redshifts, cosmo):
     """
@@ -199,7 +241,7 @@ def getMergerTimeDifference(merger_val, redshifts, cosmo):
 def cenSatObjects(conditions_obj, hd_obj, min_cluster_mass):
     "Function to obtain the merger rates of central and sattelite objects"
     # conditions
-    cen = conditions_obj & (hd_obj['HALO_pid'] == -1) & (hd_obj['HALO_M500c']>min_cluster_mass)
+    cen = conditions_obj & (hd_obj['HALO_pid'] == -1) & (hd_obj['HALO_Mvir']>min_cluster_mass)
     sat = conditions_obj & (hd_obj['HALO_pid'] != -1)
     
     # arrays
