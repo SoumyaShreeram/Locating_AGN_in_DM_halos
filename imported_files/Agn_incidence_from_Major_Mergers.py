@@ -23,6 +23,34 @@ import numpy as np
 """
 Function to create MM catalog and to count pairs
 """
+def mergerBins(hd_halo, galaxy_SMHMR_mass, mass_ratio=4):
+    """
+    Function to get the major merger bins
+    @hd_halo :: used to get the max mass of stellar mass halo
+    @galaxy_SMHMR_mass :: galaxy stellar mass to the log10
+    @mass_ratio :: M_1/M_2 to be classified as MM 
+    --> (Ellison et. al 2013 say M_1/M_2 == 4)
+    
+    @Returns :: mass bins array
+    """
+    # finding the limits on stellar mass of galaxies in halos
+    m_min, m_max = galaxy_SMHMR_mass, np.max(hd_halo['galaxy_SMHMR_mass']) 
+    mass_range = [ 10**galaxy_SMHMR_mass, 10**m_max ]
+    
+    # array of stellar mass bins
+    mass_bins = [mass_range[0]]
+    input_mass = mass_range[0]
+    
+    limit_reached = False
+    while not limit_reached:
+        # major merger == True if mass_ratio = ...
+        input_mass = mass_ratio*input_mass
+        mass_bins.append(input_mass)
+        
+        # limit is achieved when
+        if input_mass > mass_range[1]:
+            limit_reached = True
+    return np.log10(mass_bins)
 
 def createMMcatalog(hd_obj, obj_conditions, cosmo, mass_range, time_since_merger=1):
     """
@@ -44,50 +72,46 @@ def createMMcatalog(hd_obj, obj_conditions, cosmo, mass_range, time_since_merger
     merger_condition = (hd_obj['HALO_scale_of_last_MM']>merger_scale)
     
     downsample = obj_conditions + mass_condition + merger_condition
-    return hd_obj[downsample]
+    return hd_obj[downsample], downsample
 
-def shellVolume(r_p_min=10, r_p_max=100):
-    "Function to get the shell volume"
-    bin_r_p = 
-    
-    x_bin_xi3D_log = bin_xi3D_log[:-1]+ log_dR/2.
-    x_bin_xi3D = 10**x_bin_xi3D_log
-    
-    shell_volume = (bin_xi3D[1:]**3. - bin_xi3D[:-1]**3.)*4*np.pi/3.
-    return shell_volume, bin_xi3D, x_bin_xi3D
-
-
-def convertToSphericalCoord(pos_z, f_z_to_comoving_dist):
+def shellVolume(r_p_min=1, r_p_max=100, num_bins=10):
     """
-    Function to convert (x, y, z) == (ra, dec, z)  into sperical coordinates  
-    """    
-    ra, dec, redshift = pos_z[0], pos_z[1], pos_z[2]
+    Function to create projected radius array and to get the shell volume at every increment
+    """
+    # projected radius of separation r_p (kpc)
+    r_p = np.linspace(r_p_min, r_p_max, num=num_bins+1)
     
-    # defining sperical coordinates
-    dC = f_z_to_comoving_dist(redshift) # Mpc
-    theta = ra*np.pi/180.
-    phi   = dec*np.pi/180.
+    # increment in radius (kpc)
+    dr_p = [r_p[i+1] - r_p[i] for i in range(len(r_p)-1)]
     
-    # new x, y, z coordinates (Mpc)
-    x = dC *np.sin(theta)*np.cos(phi)
-    y = dC *np.sin(theta)*np.sin(phi)
-    z = dC *np.cos(theta)
-    return [x, y, z]
+    # multiply by 10e6 to have the shell vol in kpc
+    shell_volume = 4*np.pi*((r_p[:-1])*u.pc)*(dr_p*u.pc)*1e6
+    return r_p, dr_p, shell_volume
+
+
+def getSphericalCoord(hd_halo):
+    """
+    Function to get (x, y, z) OR (ra, dec, z)  in sperical coordinates  
+    """
+    pos_spherical = [hd_halo['HALO_x'], hd_halo['HALO_y'], hd_halo['HALO_z']]
+    return pos_spherical
 
     
-def findPairs(pos_z_spherical, bin_xi3D, shell_volume, leafsize=1000.0):
+def findPairs(hd_obj, leafsize=1000.0):
     """
     Find pairs of objects
     @pos_z_spherical :: [x, y, z] expressed in spherical coord
     @radius_of_search :: radius to produce a count for
     @
     """
+    pos_spherical = getSphericalCoord(hd_obj)
+    
+    # get shell volume and projected radius bins
+    r_p, dr_p, shell_volume = shellVolume()
+
     # create tree
-    tree_data = cKDTree(np.transpose(pos_z_spherical), leafsize=leafsize)
+    tree_data = cKDTree(np.transpose(pos_spherical), leafsize=leafsize)
     
     # count neighbours
-    pairs = tree_data.count_neighbors(tree_data, r=bin_xi3D)    
-    
-    # ??
-    number_pairs = (pairs[1:] - pairs[:-1])/shell_volume
-    return number_pairs
+    pairs = tree_data.count_neighbors(tree_data, r=r_p*u.pc*1e3)    
+    return pairs
