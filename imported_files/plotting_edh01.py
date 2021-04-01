@@ -36,10 +36,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 
 import Exploring_DM_Haloes as edh
-"""
-1. Functions for labeling plots
 
-"""
 
 def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
     """

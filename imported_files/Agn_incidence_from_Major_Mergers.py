@@ -71,10 +71,10 @@ def createMMcatalog(hd_obj, obj_conditions, cosmo, mass_range, time_since_merger
     # defining the merger condition
     merger_condition = (hd_obj['HALO_scale_of_last_MM']>merger_scale)
     
-    downsample = obj_conditions + mass_condition + merger_condition
+    downsample = obj_conditions & mass_condition & merger_condition
     return hd_obj[downsample], downsample
 
-def shellVolume(r_p_min=1, r_p_max=100, num_bins=10):
+def shellVolume(r_p_min=10, r_p_max=100, num_bins=10):
     """
     Function to create projected radius array and to get the shell volume at every increment
     """
@@ -85,7 +85,7 @@ def shellVolume(r_p_min=1, r_p_max=100, num_bins=10):
     dr_p = [r_p[i+1] - r_p[i] for i in range(len(r_p)-1)]
     
     # multiply by 10e6 to have the shell vol in kpc
-    shell_volume = 4*np.pi*((r_p[:-1])*u.pc)*(dr_p*u.pc)*1e6
+    shell_volume = 4*np.pi*(((r_p[:-1])*u.pc)**2)*(dr_p*u.pc)
     return r_p, dr_p, shell_volume
 
 
@@ -97,7 +97,7 @@ def getSphericalCoord(hd_halo):
     return pos_spherical
 
     
-def findPairs(hd_obj, leafsize=1000.0):
+def findPairs(hd_obj, leafsize=1000.0, h=0.6777):
     """
     Find pairs of objects
     @pos_z_spherical :: [x, y, z] expressed in spherical coord
@@ -110,8 +110,47 @@ def findPairs(hd_obj, leafsize=1000.0):
     r_p, dr_p, shell_volume = shellVolume()
 
     # create tree
-    tree_data = cKDTree(np.transpose(pos_spherical), leafsize=leafsize)
+    tree_data = cKDTree(np.transpose(np.abs(pos_spherical)), leafsize=leafsize)
     
     # count neighbours
-    pairs = tree_data.count_neighbors(tree_data, r=r_p*u.pc*1e3)    
-    return pairs
+    pairs = tree_data.count_neighbors(tree_data, r=r_p*1e-2/h)
+    
+    # number of pairs as a function of distance
+    num_pairs = (pairs[1:]-pairs[:-1])/shell_volume
+    return num_pairs
+
+def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, galaxy_SMHMR_mass, mass_ratio_for_MM, cosmo, time_since_merger):
+    """
+    Function gets the major merger sample for all mass bins, but for a given 'time since merger'
+    """
+    # generate mass bins for halos with M_1/M_2 < mass_ratio
+    mass_bins = mergerBins(hd_obj, galaxy_SMHMR_mass, mass_ratio=mass_ratio_for_MM)
+    
+    # defining new lists to save info
+    hd_mm_all, num_mm = [], []
+
+    # MM headers for objects ==> (1) given mass range and (2) given time since merger
+    for i in range(len(mass_bins)-1):
+        hd_mm, mm_cond = createMMcatalog(hd_obj, conditions_obj, cosmo, mass_range=[mass_bins[i], mass_bins[i+1]], time_since_merger=time_since_merger)
+        
+        # append the headers for each mass bin
+        hd_mm_all.append(hd_mm)
+        
+        # append the number of major mergers found for each mass bin
+        num_mm.append(len(hd_mm))
+    return hd_mm_all, np.array([num_mm, mass_bins], dtype=object)
+
+def getNumberDensityOfPairs(hd_mm_all):
+    """
+    Function to get the number density of pairs found for the range of projected radii for different mass bins
+    """
+    # get shell volume and projected radius bins
+    r_p, _, shell_volume = shellVolume()
+
+    # define empty array to same number of pairs detected as a function of radius
+    num_pairs_all = []
+
+    for i in range(len(hd_mm_all)):
+        num_pairs = findPairs(hd_mm_all[i], leafsize=1000.0)
+        num_pairs_all.append(np.array(num_pairs))
+    return num_pairs_all, r_p, shell_volume
