@@ -74,7 +74,7 @@ def createMMcatalog(hd_obj, obj_conditions, cosmo, mass_range, time_since_merger
     downsample = obj_conditions & mass_condition & merger_condition
     return hd_obj[downsample], downsample
 
-def shellVolume(r_p_min=10, r_p_max=100, num_bins=10):
+def shellVolume(r_p_min=10, r_p_max=100, num_bins=10, h=0.6777):
     """
     Function to create projected radius array and to get the shell volume at every increment
     """
@@ -84,8 +84,8 @@ def shellVolume(r_p_min=10, r_p_max=100, num_bins=10):
     # increment in radius (kpc)
     dr_p = [r_p[i+1] - r_p[i] for i in range(len(r_p)-1)]
     
-    # multiply by 10e6 to have the shell vol in kpc
-    shell_volume = 4*np.pi*(((r_p[:-1])*u.pc)**2)*(dr_p*u.pc)
+    # shell vol in kpc^3
+    shell_volume = 4*np.pi*(((r_p[:-1])*u.pc)**2)*(dr_p*u.pc)*(h**(-3))
     return r_p, dr_p, shell_volume
 
 
@@ -119,7 +119,7 @@ def findPairs(hd_obj, leafsize=1000.0, h=0.6777):
     num_pairs = (pairs[1:]-pairs[:-1])/shell_volume
     return num_pairs
 
-def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, galaxy_SMHMR_mass, mass_ratio_for_MM, cosmo, time_since_merger):
+def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, cosmo, time_since_merger, galaxy_SMHMR_mass=8.5, mass_ratio_for_MM=4):
     """
     Function gets the major merger sample for all mass bins, but for a given 'time since merger'
     """
@@ -154,3 +154,24 @@ def getNumberDensityOfPairs(hd_mm_all):
         num_pairs = findPairs(hd_mm_all[i], leafsize=1000.0)
         num_pairs_all.append(np.array(num_pairs))
     return num_pairs_all, r_p, shell_volume
+
+def studyTimeSinceMergerEffects(hd_obj, conditions_obj, cosmo, dt_m_arr, galaxy_SMHMR_mass=8.5, mass_ratio_for_MM=4):
+    """
+    Function to study the effect of time since merger of counting MM pairs
+    """
+    num_pairs_obj_dt_m, num_pairs_obj__mass_dt_m = [], []
+    
+    for dt_m in dt_m_arr:
+        hd_mm_all, _ = majorMergerSampleForAllMassBins(hd_obj, conditions_obj, cosmo, dt_m, galaxy_SMHMR_mass, mass_ratio_for_MM)
+
+        # get pairs for range of different time since merger samples
+        all_pairs_mass, _, _ = getNumberDensityOfPairs(hd_mm_all)
+    
+        # lose mass bin information
+        all_pairs = np.concatenate(all_pairs_mass, axis=0)
+        all_pairs = all_pairs[all_pairs != 0]
+        
+        # append information for the given dt_m (time since merger)
+        num_pairs_obj_dt_m.append(all_pairs)
+        num_pairs_obj__mass_dt_m.append(all_pairs_mass)
+    return num_pairs_obj_dt_m, num_pairs_obj__mass_dt_m

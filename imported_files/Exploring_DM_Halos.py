@@ -59,7 +59,7 @@ def getFilename(look_dir, pixel_no):
     return filename
 
 
-def getHeaders(pixel_no, obj, clu_files_no):
+def getHeaders(pixel_no, obj, clu_files_no=3):
     """
     Function to get all the required headers to access simulation data
     @pixel_no :: pixel number chosen to open simulation file
