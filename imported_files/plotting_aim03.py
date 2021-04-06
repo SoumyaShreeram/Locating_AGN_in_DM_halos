@@ -58,12 +58,12 @@ def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
         for legend_handle in l.legendHandles:
             legend_handle._legmarker.set_markersize(12)
             
-    ax.grid(False)
     ax.set_title(title, fontsize=18)
+    ax.grid(False)
     return
 
 
-def plotNumberDensityVsRadius(num_pairs_all0, num_pairs_all1, title):
+def plotNumberDensityVsRadius(num_pairs_all0, num_pairs_all1, title, plot_shell_vol=False):
     """
     Function to plot the number density of pairs found as a function of the projected separation for a range of different mass bins
     """
@@ -73,24 +73,31 @@ def plotNumberDensityVsRadius(num_pairs_all0, num_pairs_all1, title):
     fig, ax = plt.subplots(1,1,figsize=(7,6))
     ax.plot(r_p[1:], num_pairs_all0, "s",  color='k', label='DM halos', ms=9, mec='k')
     ax.plot(r_p[1:], num_pairs_all1, "s",  color='b', label='AGNs', ms=9, mec='b')
-
+    
+    # errorbars
+    ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
+    ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
+        if np.any(num_pairs_all[i]) != 0: ax.set_yscale("log")
+            
     # plot the shell volume
-    ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')    
+    if plot_shell_vol:
+        ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')    
     
     setLabel(ax, r'Separation, $r$ [kpc/h]', r'$n_{\rm pairs}}$ [$h^{3}/{\rm kpc}^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=True)
     ax.set_yscale("log")
     return ax
 
-def plotEffectOfTimeSinceMerger(num_pairs_dt_m, dt_m_arr, title, binsize=50):
+def plotEffectOfTimeSinceMerger(num_pairs_dt_m, dt_m_arr, title, binsize=15):
     """
     Function to plot the effect of time since merger of the number of pairs found
     """
-    pal_r = sns.color_palette("rocket").as_hex()
+    pal_r = sns.color_palette("rocket", len(dt_m_arr)).as_hex()
     labels = [r'$\Delta t_{\rm m}$ = %d Gyr'%dt for dt in dt_m_arr]
     
     fig, ax = plt.subplots(1,1,figsize=(7,6))
     
-    ax.hist(num_pairs_dt_m,  bins=binsize, color=pal_r[1:len(dt_m_arr)+1], label=labels)
+    n_p = [num_pairs_dt_m[0], num_pairs_dt_m[1], num_pairs_dt_m[2], num_pairs_dt_m[3]]
+    ax.hist(n_p,  bins=binsize, color=pal_r, label=labels)
     
     setLabel(ax, r'$n_{\rm pairs}$ [kpc$^{-3}$]', r'Number of counts', title, 'default', 'default', legend=False)
     ax.legend(loc='upper right', fontsize=14)
@@ -98,9 +105,6 @@ def plotEffectOfTimeSinceMerger(num_pairs_dt_m, dt_m_arr, title, binsize=50):
     ax.set_yscale("log")
     ax.set_xscale("log")
     return 
-
-def generateColorPalattes(length, ctype):
-    return sns.color_palette(ctype, length).as_hex()
 
 def plotTimeSinceMergerMassBins(dt_m_arr, num_pairs, title="DM Halos"):
     """
@@ -110,7 +114,7 @@ def plotTimeSinceMergerMassBins(dt_m_arr, num_pairs, title="DM Halos"):
     r_p, _, shell_volume = aimm.shellVolume()
     
     # initiating plot params
-    color_palatte = sns.color_palette("coolwarm", len(dt_m_arr)+1).as_hex()
+    color_palatte = sns.color_palette("magma", len(dt_m_arr)).as_hex()
     fig, ax = plt.subplots(1,1,figsize=(7,6))
     
     for t, dt in enumerate(dt_m_arr):
@@ -119,9 +123,8 @@ def plotTimeSinceMergerMassBins(dt_m_arr, num_pairs, title="DM Halos"):
     # plot the shell volume
     ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')
     
-    setLabel(ax, r'$n_{\rm pairs}$ [kpc$^{-3}$]', r'$n_{\rm pairs}}$ [$h^{3}/{\rm kpc}^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=True)
+    setLabel(ax, r'Separation, $r$ [kpc/h]', r'$n_{\rm pairs}$ [kpc$^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=True)
     ax.legend(loc='upper right', fontsize=14)
     
     ax.set_yscale("log")
-    ax.set_xscale("log")
     return 

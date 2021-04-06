@@ -74,8 +74,28 @@ def plotCountsInMassBins(num_mass_mm_halo, num_mass_mm_agn):
     setLabel(ax, r'$\log{\ m_{\rm stellar}}$', 'Counts', '', 'default', 'default', legend=True)
     return
 
+def getError(num_pairs):
+    """
+    Function to get the Poisson errors on the number of pairs
+    """
+    # get shell volume and projected radius bins
+    r_p, _, shell_volume = aimm.shellVolume()
+    
+    # get number of pairs from the density
+    num_pairs = num_pairs*shell_volume*(u.pc)**(-3)
+    
+    error_arr = []
+    for n in num_pairs:
+        if n != 0:     
+            error_arr.append(1/np.sqrt(n))
+        
+        # if no pairs are found for the given radius
+        else:
+            error_arr.append(0)
+    return error_arr
 
-def plotNumberDensityVsRadius(num_pairs_all, mass_bins, pal, title, l_type=True, want_label=True):
+
+def plotNumberDensityVsRadius(num_pairs_all, mass_bins, pal, title, l_type=True, want_label=True, plot_shell_vol=False):
     """
     Function to plot the number density of pairs found as a function of the projected separation for a range of different mass bins
     """
@@ -89,16 +109,20 @@ def plotNumberDensityVsRadius(num_pairs_all, mass_bins, pal, title, l_type=True,
         if want_label:
             l = r'$M = 10^{%.1f-%.1f} M_{\odot}$'%(mass_bins[i], mass_bins[i+1])
         else:
-            l = ""
-       
-        ax.plot(r_p[1:], num_pairs_all[i], "s",  color=pal[i], label=l, ms=9, mec='k')
+            l = ""       
+        
+        # main plot
+        ax.plot(r_p[1:], num_pairs_all[i], linestyle= '', marker="s",  color=pal[i], label=l, ms=9, mec='k')
+        # errorbars
+        ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
+        if np.any(num_pairs_all[i]) != 0: ax.set_yscale("log")
     
     # plot the shell volume
-    ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')    
+    if plot_shell_vol:
+        ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')    
     
-    setLabel(ax, r'Separation, $r$ [kpc/h]', r'$n_{\rm pairs}}$ [$h^{3}/{\rm kpc}^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=l_type)
-    ax.legend(loc=(1.04, 0), fontsize=14)
-    ax.set_yscale("log")
+    setLabel(ax, r'Separation, $r$ [kpc]', r'$n_{\rm pairs}}$ [${\rm kpc}^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=l_type)
+    if l_type: ax.legend(loc=(1.04, 0), fontsize=14)
     return ax
 
 def plotEffectOfTimeSinceMerger(num_pairs_dt_m, dt_m_arr, title, binsize=50):
