@@ -34,9 +34,9 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 import seaborn as sns
 
-import Agn_incidence_from_Major_Mergers as aimm
+import Modelling_AGN_fractions_from_literature as mafl
 
-def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
+def setLabel(ax, xlabel, ylabel, title='', xlim='default', ylim='default', legend=True):
     """
     Function defining plot properties
     @param ax :: axes to be held
@@ -54,7 +54,7 @@ def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
         ax.set_ylim(ylim)
     
     if legend:
-        l = ax.legend(loc='best',  fontsize=14)
+        l = ax.legend(loc='best',  fontsize=14, frameon=False)
         for legend_handle in l.legendHandles:
             legend_handle._legmarker.set_markersize(12)
             
@@ -77,7 +77,7 @@ def plotNumberDensityVsRadius(num_pairs_all0, num_pairs_all1, title, plot_shell_
     # errorbars
     ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
     ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
-        if np.any(num_pairs_all[i]) != 0: ax.set_yscale("log")
+    if np.any(num_pairs_all[i]) != 0: ax.set_yscale("log")
             
     # plot the shell volume
     if plot_shell_vol:
@@ -128,3 +128,76 @@ def plotTimeSinceMergerMassBins(dt_m_arr, num_pairs, title="DM Halos"):
     
     ax.set_yscale("log")
     return 
+
+def plotSatyapal(ax, Satyapal_14, r_p_err_S14, f_agn_err_S14, color_S14):
+    "Plot taken from Satyapal et al. 2014"
+    r_p_S14, f_agn_S14 = mafl.getXY(Satyapal_14)
+    ax.plot(r_p_S14, f_agn_S14, 'o', label='Satyapal et al. 2014', color=color_S14, ms=9, mec='#8637b8')
+
+    xerr, yerr = mafl.getErr(r_p_err_S14, r_p_S14, f_agn_err_S14, f_agn_S14)
+    ax.errorbar(r_p_S14, f_agn_S14, yerr = yerr, fmt='none', ecolor='#8637b8', capsize=2)
+    return ax, np.array([r_p_S14, f_agn_S14, xerr, yerr], dtype=object)
+
+def plotLiu(ax, r_p_L12, f_agn_L12, Liu_12_err, color_E11):
+    """
+    Plot taken from Liu et al 2012
+    """
+    ax.plot(r_p_L12, f_agn_L12, 'd', label='Liu et al. 2012', color=color_E11, ms=9, mec='#487ab8')
+
+    yerr = np.abs(np.transpose(Liu_12_err)-f_agn_L12)
+    ax.errorbar(r_p_L12, f_agn_L12, yerr = yerr, fmt='none', ecolor='#487ab8', capsize=2)
+    return ax, np.array([r_p_L12, f_agn_L12, [1e-3*np.ones(len(yerr[0])), 1e-3*np.ones(len(yerr[0]))], yerr], dtype=object) 
+
+def plotSilverman(ax, Silverman_11, r_p_err_Sil11, f_agn_err_Sil11, color_Sil11, xmax=150):
+    """
+    Plot taken from Silverman et al. 2011 
+    """
+    r_p_Sil11, f_agn_Sil11 = mafl.getXY(Silverman_11)
+    excess = ax.plot(r_p_Sil11, f_agn_Sil11, 'o', label='Silverman et al. 2011', color=color_Sil11, ms=9, mec='k')
+    control = ax.hlines(0.05, 0, xmax, colors='k', linestyles=':')
+
+    xerr, yerr = mafl.getErr(r_p_err_Sil11, r_p_Sil11, f_agn_err_Sil11, f_agn_Sil11)
+    ax.errorbar(r_p_Sil11, f_agn_Sil11, yerr = yerr, xerr = xerr, fmt='none', ecolor='k', capsize=2)   
+    return ax, np.array([r_p_Sil11, f_agn_Sil11, xerr, yerr], dtype=object)
+
+def plotEllison(ax, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, color_E11, xmax=150, mec_E11 = '#0b8700'):
+    """
+    Plot taken from Ellison et al. 2011
+    """
+    ax.plot(r_p_E11, f_agn_E11, 'o', label='Ellison et al. 2011', color=color_E11, ms=9, mec=mec_E11)
+    control = ax.hlines(0.0075, 0, xmax, colors=mec_E11, linestyles='--')
+    
+    # errorbars
+    xerr, yerr = mafl.getErr(r_p_err_E11, r_p_E11, f_agn_err_E11, f_agn_E11)
+    ax.errorbar(r_p_E11, f_agn_E11, yerr = yerr, xerr = xerr, fmt='none', ecolor=mec_E11, capsize=2)
+    return ax, np.array([r_p_E11, f_agn_E11, xerr, yerr], dtype=object)
+
+def plotAllLiteraturePlots(Satyapal_14, r_p_err_S14, f_agn_err_S14, r_p_L12, f_agn_L12, Liu_12_err, Silverman_11, r_p_err_Sil11, f_agn_err_Sil11, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, ax = None):
+    """
+    Function plots all the data points obtained from literature 
+    """
+    if ax == None:
+        fig, ax = plt.subplots(1,1,figsize=(7,6))
+    
+    xmax, ymax = 150, 0.22
+    ax.set_xticks(ticks=np.arange(0, xmax, step=10), minor=True)
+    ax.set_yticks(ticks=np.arange(0, ymax, step=1e-2), minor=True)
+    
+    color_E11, color_S14, color_Sil11 ='#d5ff03', '#ff6803', '#ff0318'
+    
+
+    # Satyapal et al. 2014
+    ax, Satyapal_14_all = plotSatyapal(ax, Satyapal_14, r_p_err_S14, f_agn_err_S14, color_S14)
+    
+    # Liu et al. 2012
+    ax, Liu_12_all = plotLiu(ax, r_p_L12, f_agn_L12, Liu_12_err, color_E11)
+    
+    # Silverman et al 2011
+    ax, Silverman_11_all = plotSilverman(ax, Silverman_11, r_p_err_Sil11, f_agn_err_Sil11, color_Sil11)
+    
+    # Ellison et al. 2011
+    ax, Ellison_11_all = plotEllison(ax, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, color_E11)
+    
+    setLabel(ax, r'Projected separation, $r_{\rm p}$ [kpc]', r'Fraction of AGNs, $f_{\rm AGN}$', xlim=[0, xmax], ylim=[0, ymax])
+    plt.savefig('figures/close_p_lit_combined.pdf', facecolor='w', edgecolor='w', bbox_inches='tight')
+    return ax, np.array([Satyapal_14_all, Liu_12_all, Silverman_11_all, Ellison_11_all], dtype=object)
