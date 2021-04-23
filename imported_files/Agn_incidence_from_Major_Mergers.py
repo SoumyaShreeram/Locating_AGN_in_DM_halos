@@ -75,15 +75,14 @@ def createMMcatalog(hd_obj, obj_conditions, cosmo, mass_range, time_since_merger
     downsample = obj_conditions & mass_condition & merger_condition
     return hd_obj[downsample], downsample
 
-def norm(n_pairs):
-    n = np.max(n_pairs)
+def norm(n):
     if n != 0:
         out = n
     else:
         out = 1
     return out
 
-def shellVolume(r_p_min=10, r_p_max=100, num_bins=10):
+def shellVolume(r_p_min=1e-2, r_p_max=1.5e-1, num_bins=15):
     """
     Function to create projected radius array and to get the shell volume at every increment
     """
@@ -94,7 +93,7 @@ def shellVolume(r_p_min=10, r_p_max=100, num_bins=10):
     dr_p = [r_p[i+1] - r_p[i] for i in range(len(r_p)-1)]
     
     # shell vol in kpc^3
-    shell_volume = 4*np.pi*(((r_p[:-1])*u.pc)**2)*(dr_p*u.pc)
+    shell_volume = 4*np.pi*( ((r_p[1:])*u.pc)**3 - ((r_p[:-1])*u.pc)**3)
     return r_p, dr_p, shell_volume
 
 
@@ -120,14 +119,14 @@ def findPairs(hd_obj, leafsize=1000.0):
     tree_data = cKDTree(np.transpose(np.abs(pos_spherical)), leafsize=leafsize)
     
     # count neighbours
-    pairs = tree_data.count_neighbors(tree_data, r=r_p*1e-2)
+    pairs = tree_data.count_neighbors(tree_data, r=r_p) 
     
-    # number of pairs as a function of distance
-    num_pairs = (pairs[1:]-pairs[:-1])/shell_volume
-    return num_pairs/norm(num_pairs)
+    # number of pairs / volume times total number of objects 
+    num_pairs = (pairs[1:]-pairs[:-1])/(norm( len(hd_obj) ) )
+    return num_pairs
 
 
-def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, cosmo, time_since_merger, galaxy_SMHMR_mass=8.5, mass_ratio_for_MM=4):
+def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, cosmo, time_since_merger, galaxy_SMHMR_mass=9, mass_ratio_for_MM=4):
     """
     Function gets the major merger sample for all mass bins, but for a given 'time since merger'
     """
@@ -163,7 +162,7 @@ def getNumberDensityOfPairs(hd_mm_all):
         num_pairs_all.append(np.array(num_pairs))
     return num_pairs_all, r_p, shell_volume
 
-def studyTimeSinceMergerEffects(hd_obj, conditions_obj, cosmo, dt_m_arr, galaxy_SMHMR_mass=8.5, mass_ratio_for_MM=4):
+def studyTimeSinceMergerEffects(hd_obj, conditions_obj, cosmo, dt_m_arr, galaxy_SMHMR_mass=9, mass_ratio_for_MM=4):
     """
     Function to study the effect of time since merger of counting MM pairs
     """

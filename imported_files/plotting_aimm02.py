@@ -74,15 +74,12 @@ def plotCountsInMassBins(num_mass_mm_halo, num_mass_mm_agn):
     setLabel(ax, r'$\log{\ m_{\rm stellar}}$', 'Counts', '', 'default', 'default', legend=True)
     return
 
-def getError(num_pairs):
+def getError(num_pairs, num_objs):
     """
     Function to get the Poisson errors on the number of pairs
     """
-    # get shell volume and projected radius bins
-    r_p, _, shell_volume = aimm.shellVolume()
-    
     # get number of pairs from the density
-    num_pairs = num_pairs*shell_volume*(u.pc)**(-3)
+    num_pairs = num_pairs*num_objs
     
     error_arr = []
     for n in num_pairs:
@@ -95,12 +92,15 @@ def getError(num_pairs):
     return error_arr
 
 
-def plotNumberDensityVsRadius(num_pairs_all, mass_bins, pal, title, l_type=True, want_label=True, plot_shell_vol=False):
+def plotNumberDensityVsRadius(num_pairs_all, obj_bins, pal, title, l_type=True, want_label=True, plot_shell_vol=False):
     """
     Function to plot the number density of pairs found as a function of the projected separation for a range of different mass bins
     """
+    num_objs, mass_bins = obj_bins[0], obj_bins[1]
+    
     # get shell volume and projected radius bins
     r_p, _, shell_volume = aimm.shellVolume()
+    r_p = r_p*1e3
     
     fig, ax = plt.subplots(1,1,figsize=(7,6))
     
@@ -114,14 +114,14 @@ def plotNumberDensityVsRadius(num_pairs_all, mass_bins, pal, title, l_type=True,
         # main plot
         ax.plot(r_p[1:], num_pairs_all[i], linestyle= '', marker="s",  color=pal[i], label=l, ms=9, mec='k')
         # errorbars
-        ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i]), ecolor=pal[i], fmt='none', capsize=4.5)
+        ax.errorbar(r_p[1:], num_pairs_all[i], yerr=getError(num_pairs_all[i], num_objs[i]), ecolor=pal[i], fmt='none', capsize=4.5)
         if np.any(num_pairs_all[i]) != 0: ax.set_yscale("log")
     
     # plot the shell volume
     if plot_shell_vol:
         ax.plot(r_p[1:], 1/shell_volume, "grey", marker=".", mfc='k', ls="--", label='Shell Volume')    
     
-    setLabel(ax, r'Separation, $r$ [kpc]', r'$n_{\rm pairs}}$ [${\rm kpc}^{-3}$]', title, [np.min(r_p[1:])-1, np.max(r_p[1:])+1], 'default', legend=l_type)
+    setLabel(ax, r'Separation, $r$ [kpc]', r'$f_{\rm MM pairs}}$', title, [np.min(r_p[1:]), np.max(r_p[1:])], 'default', legend=l_type)
     if l_type: ax.legend(loc=(1.04, 0), fontsize=14)
     return ax
 
