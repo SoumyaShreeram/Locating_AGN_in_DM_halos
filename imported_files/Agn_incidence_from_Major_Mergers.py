@@ -125,6 +125,23 @@ def findPairs(hd_obj, leafsize=1000.0):
     num_pairs = (pairs[1:]-pairs[:-1])/(norm( len(hd_obj) ) )
     return num_pairs
 
+def findPairIndexes(hd_obj, r_p, leafsize=1000.0):
+    """
+    Find the indicies of pairs of objects
+    @hd_obj :: Table <object> for an AGN/halo ...
+    """
+    pos_spherical = getSphericalCoord(hd_obj)
+    
+    # get shell volume and projected radius bins
+    r_p, dr_p, shell_volume = shellVolume()
+
+    # create tree
+    tree_data = cKDTree(np.transpose(np.abs(pos_spherical)), leafsize=leafsize)
+    
+    # list of lists of all neighbours' idxs
+    pairs_idx = tree_data.query_ball_tree(tree_data, r=r_p) 
+    return pairs_idx
+
 
 def majorMergerSampleForAllMassBins(hd_obj, conditions_obj, cosmo, time_since_merger, galaxy_SMHMR_mass=9, mass_ratio_for_MM=4):
     """
