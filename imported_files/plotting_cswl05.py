@@ -35,6 +35,7 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 
 import Agn_incidence_from_Major_Mergers as aimm
+import Comparison_simulation_with_literature_data as cswl
 
 def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
     """
@@ -71,3 +72,27 @@ def plotFpairs(ax, r_p, f_pairs, f_pairs_err, label, color='r', errorbar = True)
     if errorbar:
         ax.errorbar(r_p_kpc , np.array(f_pairs), yerr=f_pairs_err, ecolor='k', fmt='none', capsize=4.5)
     return ax
+
+
+def plotScaleMMdistribution(halo_m_scale_arr_all_r, cosmo, dt_m_arr):
+    ""
+    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    bins = 20
+    hist_all_r = np.zeros((0, bins))
+
+    for i in range(len(halo_m_scale_arr_all_r)):
+        hist_counts, a = np.histogram(halo_m_scale_arr_all_r[i], bins=bins)
+        hist_all_r = np.append(hist_all_r, [hist_counts], axis=0)
+
+        ax.plot(a[1:], hist_counts, '--', marker = 'd', color='k')
+
+    scale_mm = cswl.tmmToScale(cosmo, dt_m_arr)
+    pal1 = sns.color_palette("Spectral", len(scale_mm)+1).as_hex()
+
+    for j, l in enumerate(scale_mm):
+        ax.vlines(l, np.min(hist_all_r), np.max(hist_all_r), colors=pal1[j], label=r'$t_{\rm MM}$ = %.1f Gyr'%dt_m_arr[j])
+
+    setLabel(ax, r'Scale factor, $a$', r'Counts', '', 'default',[np.min(hist_all_r), np.max(hist_all_r)], legend=False)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
+    ax.set_yscale('log')
+    return

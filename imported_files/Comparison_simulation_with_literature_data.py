@@ -19,7 +19,6 @@ from astropy.coordinates import SkyCoord
 from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 import numpy as np
-
 import Agn_incidence_from_Major_Mergers as aimm
 
 def countPairs(pairs_idx, print_msg=True):
@@ -87,27 +86,40 @@ def indexArray(all_mm_idx):
             idx_arr.append(i)
     return idx_arr
 
-def deltaVelSelection(hd_halo, all_mm_idx, dv_cut=500):
+def deltaVelSelection(hd_halo, all_mm_idx, dv_cut=500, mm = True):
     """
+    Function to choose the pairs that meet the delta v criterion
+    @mm :: are you passing the index array after selecting major mergers?
     """
     all_dv_idx = []
     for i, mm  in enumerate(all_mm_idx):
         dv_idx = []
         
-        # going through all the major pairs to see their delta v criteria
-        if len(mm) >= 1:
-            for m in mm:
-                dv = 3e5*(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R']) 
-                
-                # applying the selection criteria
-                if dv < dv_cut:
-                    dv_idx.append(m)
-                
+        # if major pairs are not selected before the all_mm_idx enters this function
+        if not mm:
+            # going through all the pairs to see their delta v criteria
+            if len(mm) > 1:
+                for m in mm[1:]:
+                    dv = 3e5*(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R']) 
+
+                    # applying the selection criteria
+                    if dv < dv_cut:
+                        dv_idx.append(m)
+        else:
+            # going through all the major pairs to see their delta v criteria
+            if len(mm) >= 1:
+                for m in mm:
+                    dv = 3e5*(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R']) 
+
+                    # applying the selection criteria
+                    if dv < dv_cut:
+                        dv_idx.append(m)
+            
         all_dv_idx.append(dv_idx)
     count_dv_major_mergers = countSelectedPairs(all_dv_idx, string = 'Delta v %d cut: '%dv_cut)
     return all_dv_idx, count_dv_major_mergers
 
-def openPairsFiles(data_dir = 'Data/pairs_z2/', redshift_limit = 2, mass_max = 3, dv_cut = 500):
+def openPairsFiles(data_dir = 'Data/Major_pairs/pairs_z2/', redshift_limit = 2, mass_max = 3, dv_cut = 500):
     """
     Function to open all the files with 
     """
@@ -116,35 +128,53 @@ def openPairsFiles(data_dir = 'Data/pairs_z2/', redshift_limit = 2, mass_max = 3
     pairs_idx_all, n_pairs_arr = [], []
     
     for i in range(len(r_p)):
-        pairs_idx = np.load('Data/pairs_z%d/pairs_idx_r%d_mm%d_dv%d.npy'%(redshift_limit, i, mass_max, dv_cut), allow_pickle=True)
+        pairs_idx = np.load(data_dir+'pairs_idx_r%d_mm%d_dv%d.npy'%(i, mass_max, dv_cut), allow_pickle=True)
         n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
         
         n_pairs_arr.append(n_pairs)
         pairs_idx_all.append(pairs_idx)        
     return np.array([pairs_idx_all, n_pairs_arr], dtype=object)
 
+def tmmToScale(cosmo, dt_m_arr):
+    "Function to convert time time since MM array to scale factor of last MM"
+    scale_mm = []
+    for t in dt_m_arr:
+        # converting the time since merger into scale factor
+        merger_z = z_at_value(cosmo.lookback_time, t*u.Gyr)
+        merger_scale = 1/(1 + merger_z)
+        scale_mm.append(merger_scale)
+    return scale_mm
+
+def calTmm(cosmo, a, z):
+    # convert the merger scale factor into redshift
+    merger_z = z_at_value(cosmo.scale_factor, a)
+    
+    # convert the merger & current redshifts into lookback time
+    merger_time = cosmo.lookback_time(merger_z)
+    current_time = cosmo.lookback_time(z)
+    
+    # difference in lookback time between the merger and AGN redshift
+    diff_time = merger_time-current_time
+    return diff_time
+
 def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     """
     Define the time since merger cut 
     """
-    # converting the time since merger into scale factor
-    merger_z = z_at_value(cosmo.lookback_time, time_since_merger*u.Gyr)
-    merger_scale = 1/(1 + merger_z)
-    
     # object arr to save major pairs for every DM halo
     all_t_mm_idx = []
     
     for i, p in enumerate(pairs_idx): 
         # list to save indicies of pairs classified as major mergers
         t_mm_idx = []
+        diff_time = calTmm(cosmo, hd_obj[i]['HALO_scale_of_last_MM'], hd_obj[i]['redshift_R'])
         
         # if there are more than 'self'-pairs
-        if len(p) > 1:
-            for p_idx in p[1:]:
-                halo_merger_scale = hd_obj[i]['HALO_scale_of_last_MM']
-                
+        if len(p) >= 1:
+            for p_idx in p:                
+                diff_time_pair = calTmm(cosmo, hd_obj[p_idx]['HALO_scale_of_last_MM'], hd_obj[p_idx]['redshift_R'])
                 # only consider pairs that pass this time since merger-scale criterion
-                if halo_merger_scale > merger_scale:
+                if (diff_time_pair <= time_since_merger*u.Gyr) or  (diff_time <= time_since_merger*u.Gyr):
                     t_mm_idx.append(p_idx)
                     
         # save this info for the given halo in the object array
@@ -153,15 +183,29 @@ def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
+def concatAllTmmFiles(dt_m_arr, redshift_limit=2, data_dir = 'Data/pairs_z2/'):
+    """
+    Function to concatenate all the files containing pairs for different T_mm criteria
+    """
+    r_p, _, _ = aimm.shellVolume()
+    n_pairs_t_mm_all = np.zeros( (0, len(r_p) ) )
+    
+    for dt_m in dt_m_arr:
+        n_pairs_t_mm = np.load(data_dir+'all_pairs_t_mm%.1f_r.npy'%(dt_m), allow_pickle=True)
+        
+        # save the counts for all radius bins for a given time since merger
+        n_pairs_t_mm_all = np.append(n_pairs_t_mm_all, n_pairs_t_mm, axis=0)
+    return n_pairs_t_mm_all
+
 def error(n_pairs):
-    "Calculated the error on the data points"    
-    out = []
+    "Calculates the error on the pairs"    
+    err = []
     for n in n_pairs:
         if n != 0:
-            out.append(1/np.sqrt(n))
+            err.append(1/np.sqrt(n))
         else:
-            out.append(1)
-    return out
+            err.append(0)
+    return err
 
 def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     """
@@ -170,8 +214,6 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
                 --> dt_m_idx = 1 corresponds to 1 Gyr; chosen from [0.5, 1, 2, 3, 4]
     @redshift_limit :: the initial redshift limit set on the sample (needed for opening dir)
     """
-    all_pairs_t_mm_r = np.load('Data/pairs_z%d/all_pairs_t_mm_r.npy'%(redshift_limit), allow_pickle=True)
-    
     num_pairs = all_pairs_vs_rp[1:] - all_pairs_vs_rp[:-1]
     
     # get shell volume and projected radius bins
@@ -183,3 +225,24 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     
     f_pairs = num_pairs/(N*shell_volume)
     return f_pairs, error(num_pairs)
+
+def getAllMMscales(hd_obj, pairs_mm_all, r_p):
+    "Function to get the scale of last MM of all the pairs for all radius"
+    halo_m_scale_arr_all_r = []
+    for i in range(len(r_p)):
+        halo_m_scale_arr = []
+
+        for i, p in enumerate(pairs_mm_all[0][i]): 
+            # list to save indicies of pairs classified as major mergers
+            t_mm_idx = []
+            halo_merger_scale0 = hd_obj[i]['HALO_scale_of_last_MM']
+            halo_m_scale_arr.append(halo_merger_scale0)
+            # get scale factor of the companion
+            if len(p) > 1:
+                for p_idx in p:
+                    halo_merger_scale1 = hd_obj[p_idx]['HALO_scale_of_last_MM']
+                    halo_m_scale_arr.append(halo_merger_scale1)
+
+        # save the info
+        halo_m_scale_arr_all_r.append(halo_m_scale_arr)
+    return halo_m_scale_arr_all_r
