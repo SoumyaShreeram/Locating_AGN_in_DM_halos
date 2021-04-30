@@ -119,7 +119,7 @@ def deltaVelSelection(hd_halo, all_mm_idx, dv_cut=500, mm = True):
     count_dv_major_mergers = countSelectedPairs(all_dv_idx, string = 'Delta v %d cut: '%dv_cut)
     return all_dv_idx, count_dv_major_mergers
 
-def openPairsFiles(data_dir = 'Data/Major_pairs/pairs_z2/', redshift_limit = 2, mass_max = 3, dv_cut = 500):
+def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dv_cut = 500):
     """
     Function to open all the files with 
     """
@@ -128,12 +128,35 @@ def openPairsFiles(data_dir = 'Data/Major_pairs/pairs_z2/', redshift_limit = 2, 
     pairs_idx_all, n_pairs_arr = [], []
     
     for i in range(len(r_p)):
-        pairs_idx = np.load(data_dir+'pairs_idx_r%d_mm%d_dv%d.npy'%(i, mass_max, dv_cut), allow_pickle=True)
+        if key == 'mm and dv':
+            filename = 'Major_pairs/pairs_idx_r%.1f_mm%d_dv%d.npy'%(i, mass_max, dv_cut)
+        if key == 'dv':
+            filename = 'dv_pairs/pairs_idx_r%d_dv%d.npy'%(i, dv_cut)
+        if key == 'all':
+            filename = 'pairs_idx_r%d.npy'%(i)
+            
+        pairs_idx = np.load(data_dir+filename, allow_pickle=True)
         n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
         
         n_pairs_arr.append(n_pairs)
         pairs_idx_all.append(pairs_idx)        
     return np.array([pairs_idx_all, n_pairs_arr], dtype=object)
+
+def saveTmmFiles(key, dt, arr , redshift_limit = 2):
+    """
+    Function decides where to save the tmm evaluated files
+    """
+    if key == 'mm and dv':
+        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+        
+    if key == 'dv':
+        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+
+    # if you want to save all the pairs
+    if key == 'all':
+        np.save('Data/pairs_z%.1f/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+    return
+
 
 def tmmToScale(cosmo, dt_m_arr):
     "Function to convert time time since MM array to scale factor of last MM"
@@ -183,18 +206,53 @@ def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
-def concatAllTmmFiles(dt_m_arr, redshift_limit=2, data_dir = 'Data/pairs_z2/'):
+def defineTimeSinceMergeCut2(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, time_since_merger = 1, redshift_limit = 2):
+    """
+    Define the time since merger cut 
+    """
+    # object arr to save major pairs for every DM halo
+    all_t_mm_idx = []
+    
+    
+    for i, p in enumerate(pairs_idx): 
+        # list to save indicies of pairs classified as major mergers
+        t_mm_idx = []
+        diff_time = diff_t_mm_arr[i]
+        
+        # if there are more than 'self'-pairs
+        if len(p) >= 1:
+            for p_idx in p:                
+                diff_time_pair = diff_t_mm_arr[p_idx]
+                # only consider pairs that pass this time since merger-scale criterion
+                if (diff_time_pair <= time_since_merger) or  (diff_time <= time_since_merger):
+                    t_mm_idx.append(p_idx)
+                    
+        # save this info for the given halo in the object array
+        all_t_mm_idx.append(t_mm_idx)
+    
+    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
+    return all_t_mm_idx, count_t_mm
+
+
+def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2):
     """
     Function to concatenate all the files containing pairs for different T_mm criteria
     """
     r_p, _, _ = aimm.shellVolume()
     n_pairs_t_mm_all = np.zeros( (0, len(r_p) ) )
     
+    if key == 'mm and dv':
+        data_dir = 'Data/pairs_z%.1f/Major_pairs/'%redshift_limit
+    if key == 'dv':
+        data_dir = 'Data/pairs_z%.1f/dv_pairs/'%redshift_limit
+    if key == 'all':
+        data_dir = 'Data/pairs_z%.1f/'%redshift_limit    
+        
     for dt_m in dt_m_arr:
-        n_pairs_t_mm = np.load(data_dir+'all_pairs_t_mm%.1f_r.npy'%(dt_m), allow_pickle=True)
+        n_pairs_t_mm = np.load(data_dir+'all_pairs_t_mm%.1f.npy'%(dt_m), allow_pickle=True)
         
         # save the counts for all radius bins for a given time since merger
-        n_pairs_t_mm_all = np.append(n_pairs_t_mm_all, n_pairs_t_mm, axis=0)
+        n_pairs_t_mm_all = np.append(n_pairs_t_mm_all, [n_pairs_t_mm], axis=0)
     return n_pairs_t_mm_all
 
 def error(n_pairs):
@@ -221,7 +279,7 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     
     # normalization
     total_num_pairs = len(hd_obj)    
-    N = total_num_pairs*(total_num_pairs - 1)
+    N = 2*total_num_pairs*(total_num_pairs - 1)
     
     f_pairs = num_pairs/(N*shell_volume)
     return f_pairs, error(num_pairs)

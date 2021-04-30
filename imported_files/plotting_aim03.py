@@ -172,14 +172,14 @@ def plotEllison(ax, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, color_E11, x
     ax.errorbar(r_p_E11, f_agn_E11, yerr = yerr, xerr = xerr, fmt='none', ecolor=mec_E11, capsize=2)
     return ax, np.array([r_p_E11, f_agn_E11, xerr, yerr], dtype=object)
 
-def plotAllLiteraturePlots(Satyapal_14, r_p_err_S14, f_agn_err_S14, r_p_L12, f_agn_L12, Liu_12_err, Silverman_11, r_p_err_Sil11, f_agn_err_Sil11, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, ax = None):
+def plotAllLiteraturePlots(Satyapal_14, r_p_err_S14, f_agn_err_S14, r_p_L12, f_agn_L12, Liu_12_err, Silverman_11, r_p_err_Sil11, f_agn_err_Sil11, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, ax = None, xmax= 150,ymax = 0.22):
     """
     Function plots all the data points obtained from literature 
     """
     if ax == None:
         fig, ax = plt.subplots(1,1,figsize=(7,6))
     
-    xmax, ymax = 150, 0.22
+    
     ax.set_xticks(ticks=np.arange(0, xmax, step=10), minor=True)
     ax.set_yticks(ticks=np.arange(0, ymax, step=1e-2), minor=True)
     

@@ -122,7 +122,8 @@ def findPairs(hd_obj, leafsize=1000.0):
     pairs = tree_data.count_neighbors(tree_data, r=r_p) 
     
     # number of pairs / volume times total number of objects 
-    num_pairs = (pairs[1:]-pairs[:-1])/(norm( len(hd_obj) ) )
+    N = norm( len(hd_obj) )
+    num_pairs = (pairs[1:]-pairs[:-1])/(N*(N-1)*shell_volume)
     return num_pairs
 
 def findPairIndexes(hd_obj, r_p, leafsize=1000.0):

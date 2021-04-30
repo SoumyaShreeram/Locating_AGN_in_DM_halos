@@ -68,14 +68,17 @@ def plotFpairs(ax, r_p, f_pairs, f_pairs_err, label, color='r', errorbar = True)
     r_p_kpc, f_pairs = 1e3*r_p[1:], 1e9*f_pairs
 
     # plotting the results
-    ax.plot( r_p_kpc , f_pairs, 's', color=color, label = label)
+    ax.plot( r_p_kpc , f_pairs, 's', ls='--', color=color, label = label)
     if errorbar:
         ax.errorbar(r_p_kpc , np.array(f_pairs), yerr=f_pairs_err, ecolor='k', fmt='none', capsize=4.5)
     return ax
 
 
 def plotScaleMMdistribution(halo_m_scale_arr_all_r, cosmo, dt_m_arr):
-    ""
+    """
+    Function plots the number of objects in pairs as a function of the scale of last MM
+    --> the cuts on delta t_mm are overplotted to see the selection criterion
+    """
     fig, ax = plt.subplots(1,1,figsize=(7,6))
     bins = 20
     hist_all_r = np.zeros((0, bins))
