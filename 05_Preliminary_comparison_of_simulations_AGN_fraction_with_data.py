@@ -72,16 +72,16 @@ dt_m_arr = [0.5, 1, 2, 3, 4]
 mass_max = 3
 
 # defining the redshift bin for a merger in terms of dv = c*z [km/s]
-dv_cut =  500
+dv_cut =  1000
 
 # BOOLEAN: if the pairs have already been computed before
-run_find_pairs = True
-run_merger_pairs = False
+run_find_pairs = False
+run_merger_pairs = True
 
 # BOOLEAN: if we want to find all pairs (not just major pairs)
-major_mergers_only = True
+major_mergers_only = False
 delta_v_cut = True
-
+keyword = 'dv' # 'mm and dv' or 'all'
 """
 3. Open files and get relevant data
 """
@@ -97,7 +97,7 @@ print("Halos: %d"%(len(hd_halo_z) ))
 3. Finding halo pairs
 """
 if run_find_pairs:
-    for r in [0]:
+    for r in [0, 1, 2, 3, 4]:
         print('\n ---- pairs within radius %.2f Mpc ---'%r_p[r])
         pos_spherical = aimm.getSphericalCoord(hd_halo_z)
 
@@ -114,20 +114,21 @@ if run_find_pairs:
            
         if delta_v_cut:            
             # (2) choose only major pairs that satisfy the delta v criteria
-            all_dv_idx, count_dv_major_pairs = cswl.deltaVelSelection(hd_halo_z, all_mm_idx, mm = major_mergers_only)
+            all_dv_idx, count_dv_major_pairs = cswl.deltaVelSelection(hd_halo_z, all_mm_idx, mm = major_mergers_only, dv_cut=dv_cut)
         
         # save file based on the criteria applied        
-        if major_mergers_only and delta_v_cut:
+        if keyword == 'mm and dv':
             np.save('Data/pairs_z%.1f/Major_pairs/pairs_idx_r%.1f_mm%d_dv%d.npy'%(redshift_limit, r, mass_max, dv_cut), all_dv_idx, allow_pickle=True)
-            print('\n --- Saved File --- ')
+            print('\n --- Saved mm file --- ')
             
-        if not major_mergers_only and delta_v_cut:
-            np.save('Data/pairs_z%.1f/dv_pairs/pairs_idx_r%.1f_dv%d.npy'%(redshift_limit, r, mass_max, dv_cut), all_dv_idx, allow_pickle=True)
-            print('\n --- Saved File --- ')
+        if keyword == 'dv':
+            np.save('Data/pairs_z%.1f/dv_pairs/pairs_idx_r%.1f_dv%d.npy'%(redshift_limit, r, dv_cut), all_dv_idx, allow_pickle=True)
+            print('\n --- Saved dv file --- ')
             
         # if you want to save all the pairs
-        if not major_mergers_only and not delta_v_cut:
+        if keyword == 'all':
             np.save('Data/pairs_z%.1f/pairs_idx_r%d.npy'%(redshift_limit, r), all_mm_idx, allow_pickle=True)
+            print('\n --- Saved no cuts file --- ')
             
 """
 4. Studying the effect of Δ𝑡_merger on MM pairs
@@ -140,11 +141,11 @@ where 𝑁𝑃 is the number of pairs and 𝑁 is the total number of objects fr
 """
 
 if run_merger_pairs:
-    pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, mm=major_mergers_only)
+    pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, key = keyword, dv_cut= dv_cut)
     
     diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
     
-    for dt_m in dt_m_arr[4:]:
+    for dt_m in dt_m_arr[1:2]:
         count_t_mm_arr = []
 
         for r in range(len(r_p)): 
@@ -153,4 +154,4 @@ if run_merger_pairs:
             _, count_t_mm = cswl.defineTimeSinceMergeCut2(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, time_since_merger = dt_m, redshift_limit = redshift_limit)
             count_t_mm_arr.append(count_t_mm)
           
-        cswl.saveTmmFiles('mm and dv', dt_m, arr = count_t_mm_arr, redshift_limit = redshift_limit)
+        cswl.saveTmmFiles(keyword, dt_m, arr = count_t_mm_arr, redshift_limit = redshift_limit)

@@ -99,3 +99,21 @@ def plotScaleMMdistribution(halo_m_scale_arr_all_r, cosmo, dt_m_arr):
     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
     ax.set_yscale('log')
     return
+
+def plotNpSep(ax, hd_z_halo, pairs_all, color, label, errorbars = True):
+    """
+    Function plots the n_p as a function of separation
+    """
+    # get number density of pairs with and without selection cuts
+    n_pairs, n_pairs_err = cswl.nPairsToFracPairs(hd_z_halo, pairs_all[1])
+    
+    # changing all unit to kpc
+    r_p_kpc, n_pairs =  1e3*r_p[1:], 1e9*n_pairs
+    
+    # plotting the results
+all_pairs = ax.plot( r_p_kpc , n_pairs, 'd', color=color, label=label)
+    
+    # errorbars
+    if errorbars:
+        ax.errorbar(r_p_kpc , np.array(n_pairs), yerr=n_pairs_err, ecolor='k', fmt='none', capsize=4.5)
+    return ax, n_pairs, n_pairs_err

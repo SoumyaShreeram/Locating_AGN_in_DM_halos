@@ -131,7 +131,7 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
         if key == 'mm and dv':
             filename = 'Major_pairs/pairs_idx_r%.1f_mm%d_dv%d.npy'%(i, mass_max, dv_cut)
         if key == 'dv':
-            filename = 'dv_pairs/pairs_idx_r%d_dv%d.npy'%(i, dv_cut)
+            filename = 'dv_pairs/pairs_idx_r%.1f_dv%d.npy'%(i, dv_cut)
         if key == 'all':
             filename = 'pairs_idx_r%d.npy'%(i)
             
@@ -304,3 +304,171 @@ def getAllMMscales(hd_obj, pairs_mm_all, r_p):
         # save the info
         halo_m_scale_arr_all_r.append(halo_m_scale_arr)
     return halo_m_scale_arr_all_r
+
+def getPairIndicies(pairs_idx, r, keyword = ''):
+    "Function generates an array that holds all the pair indicies"
+    pairs_arr = np.zeros((0, 2))
+    two_idx = []
+    
+    # get the indicies of the pair
+    for j in range(pairs_idx[r].shape[0]):
+        if keyword == 'all':
+            if len(pairs_idx[r][j]) > 1:
+                for p in pairs_idx[r][j]:
+                    two_idx = [j, p]
+                    pairs_arr = np.append(pairs_arr, [two_idx], axis=0)
+        else:
+            if len(pairs_idx[r][j]) >= 1:
+                for p in pairs_idx[r][j]:
+                    two_idx = [j, p]
+                    pairs_arr = np.append(pairs_arr, [two_idx], axis=0)
+    return pairs_arr
+
+def getHalosWithMaxRcompanion(pairs_mm_all, keyword = 'mm and dv', index_of_max_companion = 7):
+    """
+    Function to get all the halos within the defined radius r_p[index_of_max_companion] (usually 80 kpc)
+    @pairs_mm_all[0] :: list of lists holding indicies of all halos with a companion <r_p[r]
+    @keyword :: can be 'dv' --> redshift selection only
+                'mm and dv' --> major merger and redshift selection
+                'all' --> no selection
+    @index_of_max_companion :: this is the index of the r_p arr 
+                            -->  decides to save companions within r_p[idx]
+    @returns :: unique elements of an (N, 2) array containing idx of all halos with a pairs within r_p[idx]
+    """
+    halos_w_pair_lessthan_r = np.zeros((0,2))
+    
+    for r in range(index_of_max_companion):
+        pairs_arr = getPairIndicies(pairs_mm_all[0], r, keyword = keyword)
+        halos_w_pair_lessthan_r = np.append(halos_w_pair_lessthan_r, pairs_arr, axis=0)
+
+    halos_w_pair_lessthan_r = np.unique(np.concatenate(halos_w_pair_lessthan_r, axis=None))
+    return halos_w_pair_lessthan_r
+
+def getRedshiftMatchedControl(hd_halo, pairs_all, r, keyword='dv', step_z=0.01, redshift_limit=2):
+    """
+    Function gets the redshift matched control sample for all the pairs at a given separation
+    @hd_halo :: astropy Table file containing all the halos < redshift_limit
+    @pairs_all[0] :: contains all the indicies of the halos in a pair  
+    @returns :: np object containing the indicies of the halos chosen in the 'control sample' for every pair & the corresponding count of the total halos in the control 
+    """
+    # depricated initialition of a list of lists arr ;)
+    z_matched_arr = []
+    
+    # get pair indicies for the given r
+    pairs_arr = getPairIndicies(pairs_all[0], r, keyword = keyword)
+    
+    # get indicies of all halos in a pair with r <~ 80 kpc
+    halos_w_pair_lessthan_r = getHalosWithMaxRcompanion(pairs_all)
+    
+    count_z_matched_bkgs = 0
+    z_arr = hd_halo['redshift_R']
+    
+    # loop over all the pairs at the given separation
+    for pairs in pairs_arr:
+        # match redshifts
+        z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
+        mean_z = (z1 + z2)/2
+        
+        # count all objects in the same redshift bin
+        z_matched = [i for i in range(len(z_arr)) if (mean_z - step_z) < z_arr[i] < (mean_z + step_z) ]
+        
+        # keep all halos in the bin that DO NOT have companions with r <~ 80 kpc
+        keeping_idx = [keep for keep in range(len(z_matched)) if z_matched[keep] not in halos_w_pair_lessthan_r]
+        z_matched = np.array(z_matched)[keeping_idx]
+        
+        # save this useful info that is just found out
+        z_matched_arr.append(z_matched)
+        count_z_matched_bkgs += len(z_matched)
+        
+    z_matched_control = np.array([z_matched_arr, count_z_matched_bkgs], dtype=object)
+    np.save('Data/pairs_z%.1f/control_idx_r%.1f.npy'%(redshift_limit, r), z_matched_control, allow_pickle=True)
+    return
+
+def getMassRatios(pairs_arr, hd_halo):
+    """
+    Function calculates the mass ratio between the pairs
+    """
+    mass_ratios = []
+    m_arr = hd_halo['galaxy_SMHMR_mass']
+    
+    for pairs in pairs_arr:
+        # get masses of the pair
+        m1, m2 = m_arr[int(pairs[0])], m_arr[int(pairs[1])]
+        ratio = m1/m2        
+        mass_ratios.append(ratio)
+    return mass_ratios
+
+
+def getMassMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 6, redshift_limit=2):
+    """
+    Function matches the mass of pairs 'with selection cuts' with those 'with no selections cuts'
+    """
+    # depricated initialition of a list of lists arr ;)
+    mass_matched_pair_arr = []
+    
+    # get pair indicies for the given r
+    pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
+    pairs_all_arr = getPairIndicies(pairs_all[0], r, keyword = 'all')
+    
+    mass_ratios = getMassRatios(pairs_all_arr, hd_halo)
+    m_arr = hd_halo['galaxy_SMHMR_mass']
+    
+    count_m_matched_pairs = 0
+    # loop over all the pairs at the given separation
+    for pairs in pairs_selected_arr:
+        # match redshifts
+        m1_selected, m2_selected = m_arr[int(pairs[0])], m_arr[int(pairs[1])]
+        m_ratio = m1_selected/m2_selected
+        
+        # count all objects in the same mass bin
+        m_matched = [i for i in range(len(pairs_all_arr)) if m_ratio - mr_min <= mass_ratios[i] <= m_ratio + mr_max ]
+        
+        # save this useful info that is just found out
+        mass_matched_pair_arr.append(m_matched)       
+        count_m_matched_pairs += len(m_matched)
+        
+    m_matched_control = np.array([mass_matched_pair_arr, count_m_matched_pairs], dtype=object)
+    np.save('Data/pairs_z%.1f/control_pairs_idx_r%.1f.npy'%(redshift_limit, r), m_matched_control, allow_pickle=True)
+    return
+
+def getMeanZforControlPairs(hd_halo, pairs_all_arr, redshift_limit, r):
+    """
+    Functino to get the z of the control pairs
+    """
+    mean_z_arr = []
+    z_arr = hd_halo['redshift_R']
+    
+    # load the chosen mass matched indicies
+    m_matched_control = np.load('Data/pairs_z%.1f/control_pairs_idx_r%.1f.npy'%(redshift_limit, r), allow_pickle=True)
+    
+    for pairs in m_matched_control[0]:
+        # get masses of the pair
+        z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
+        mean_z = (z1 + z2)/2        
+        mean_z_arr.append(mean_z)
+    return mean_z_arr
+
+def getRedshiftMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 6, redshift_limit=2):
+    """
+    Function to match the redshifts of the pairs 
+    """
+    # get pair indicies for the given r
+    pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
+    pairs_all_arr = getPairIndicies(pairs_all[0], r, keyword = 'all')
+    
+    count_z_matched_bkgs = 0
+    z_arr = hd_halo['redshift_R']
+        
+    # for every pair
+    for pairs in pairs_selected_arr:
+        # match redshifts
+        z1, z2 = z_arr[int(pairs_selected_arr[0])], z_arr[int(pairs_selected_arr[1])]
+        mean_z = (z1 + z2)/2
+        
+        # redshift of the 'no selection halo pairs'
+        mean_z_arr = getMeanZforControlPairs(hd_halo, pairs_all_arr, redshift_limit, r)
+        # count all objects in the same redshift bin
+        z_matched = [i for i in range(len(z_arr)) if (mean_z - step_z) < z_arr[i] < (mean_z + step_z) ]
+    
+        # look into the indicies that pass the z criteria
+    return
