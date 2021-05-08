@@ -86,15 +86,12 @@ def shellVolume(r_p_min=1e-2, r_p_max=1.5e-1, num_bins=15):
     """
     Function to create projected radius array and to get the shell volume at every increment
     """
-    # projected radius of separation r_p (kpc)
+    # projected radius of separation r_p (Mpc)
     r_p = np.linspace(r_p_min, r_p_max, num=num_bins+1)
     
-    # increment in radius (kpc)
-    dr_p = [r_p[i+1] - r_p[i] for i in range(len(r_p)-1)]
-    
-    # shell vol in kpc^3
-    shell_volume = 4*np.pi*( ((r_p[1:])*u.pc)**3 - ((r_p[:-1])*u.pc)**3)
-    return r_p, dr_p, shell_volume
+    # shell vol in Mpc^3
+    shell_volume = 4*np.pi*( ((r_p[1:])*u.Mpc)**3 - ((r_p[:-1])*u.Mpc)**3)
+    return r_p, shell_volume
 
 
 def getSphericalCoord(hd_halo):

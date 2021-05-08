@@ -21,37 +21,49 @@ from astropy.cosmology import FlatLambdaCDM, z_at_value
 import numpy as np
 import Agn_incidence_from_Major_Mergers as aimm
 
-def countPairs(pairs_idx, print_msg=True):
-    """
-    Function to count pairs, for every DM halo, without including self
-    """
-    count_pairs, count_no_pairs = 0, 0
-    for p in pairs_idx:
-        if len(p) > 1:
-            count_pairs += len(p)
-        # ignore the halo itself in the counting of pairs
-        else:
-            count_no_pairs += 1
-    fraction_of_pairs = count_pairs/count_no_pairs
-    
-    if print_msg:
-        print('%d pairs found among %d halos; fraction of pairs: %.4f'%(count_pairs, len(pairs_idx), fraction_of_pairs))
-        
-    return count_pairs, fraction_of_pairs
 
-def countSelectedPairs(all_mm_idx, print_msg = True, string = 'Major merger cut: '):
+def countSelectedPairs(all_selected_idx, print_msg = True, string = 'Major merger cut: '):
+    """
+    Function to count selected pairs from the list of lists outputted by ball tree
+    @all_selected_idx :: 
+    """
     count_selected_pairs = 0
     
-    for j in range( len(all_mm_idx) ):
+    for j, mm in enumerate(all_selected_idx):
         
-        if len(all_mm_idx[j]) >= 1:
-            count_selected_pairs += len(all_mm_idx[j][1:])
-    
+        if len(mm) >= 1:
+            for m in mm:
+                if j != m:
+                    count_selected_pairs += 1
     if print_msg:
-        print(string+'%d selected pairs'%count_selected_pairs)
+        print(string+'%d selected pairs'%(count_selected_pairs/2))
     return count_selected_pairs
 
-def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3): 
+def deltaVelSelection(hd_halo, all_mm_idx, dz_cut=0.001):
+    """
+    Function to choose the pairs that meet the delta v criterion
+    @mm :: are you passing the index array after selecting major mergers?
+    """
+    all_dz_idx = []
+    for i, mm  in enumerate(all_mm_idx):
+        dz_idx = []
+        
+        # going through all the pairs to see their delta v criteria
+        if len(mm) >= 1:
+            for m in mm:
+                if i != m:
+                    dz_r = np.abs(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R'])
+                    dz_s = np.abs(hd_halo[i]['redshift_S'] - hd_halo[m]['redshift_S'])
+
+                    # applying the selection criteria
+                    if dz_r < dz_cut and dz_s < dz_cut:
+                        dz_idx.append(m)
+        all_dz_idx.append(dz_idx)
+    count_dz_major_mergers = countSelectedPairs(all_dz_idx, string = 'Delta z %d cut: '%dz_cut)
+    return all_dz_idx, count_dz_major_mergers
+
+
+def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3, keyword='mm and dv'): 
     """
     Function to choose the pairs that classify as major mergers
     @hd_halo :: header file with all the DM halos
@@ -63,16 +75,16 @@ def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3):
     for i, p in enumerate(pairs_idx): 
         # list to save indicies of pairs classified as major mergers
         mm_idx = []
-        
-        # if there are more than 'self'-pairs
-        if len(p) > 1:
-            for p_idx in p[1:]:
-                mass_ratio = hd_halo[i]['galaxy_SMHMR_mass']/hd_halo[p_idx]['galaxy_SMHMR_mass']
-                
-                # only consider pairs that pass mass ratios criterion
-                if float(mass_ratio) >= mass_min and float(mass_ratio) <= mass_max:
-                    mm_idx.append(p_idx)
-                    
+       
+        if len(p) >= 1:
+            for p_idx in p:
+                if i != p_idx:
+                    mass_ratio = hd_halo[i]['galaxy_SMHMR_mass']/hd_halo[p_idx]['galaxy_SMHMR_mass']
+
+                    # only consider pairs that pass mass ratios criterion
+                    if float(mass_ratio) >= mass_min and float(mass_ratio) <= mass_max:
+                        mm_idx.append(p_idx)
+
         # save this info for the given halo in the object array
         all_mm_idx.append(mm_idx)
     
@@ -86,54 +98,23 @@ def indexArray(all_mm_idx):
             idx_arr.append(i)
     return idx_arr
 
-def deltaVelSelection(hd_halo, all_mm_idx, dv_cut=500, mm = True):
-    """
-    Function to choose the pairs that meet the delta v criterion
-    @mm :: are you passing the index array after selecting major mergers?
-    """
-    all_dv_idx = []
-    for i, mm  in enumerate(all_mm_idx):
-        dv_idx = []
-        
-        # if major pairs are not selected before the all_mm_idx enters this function
-        if not mm:
-            # going through all the pairs to see their delta v criteria
-            if len(mm) > 1:
-                for m in mm[1:]:
-                    dv = 3e5*(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R']) 
-
-                    # applying the selection criteria
-                    if dv < dv_cut:
-                        dv_idx.append(m)
-        else:
-            # going through all the major pairs to see their delta v criteria
-            if len(mm) >= 1:
-                for m in mm:
-                    dv = 3e5*(hd_halo[i]['redshift_R'] - hd_halo[m]['redshift_R']) 
-
-                    # applying the selection criteria
-                    if dv < dv_cut:
-                        dv_idx.append(m)
-            
-        all_dv_idx.append(dv_idx)
-    count_dv_major_mergers = countSelectedPairs(all_dv_idx, string = 'Delta v %d cut: '%dv_cut)
-    return all_dv_idx, count_dv_major_mergers
-
-def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dv_cut = 500):
+def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001):
     """
     Function to open all the files with 
     """
     # get shell volume and projected radius bins
-    r_p, dr_p, shell_volume = aimm.shellVolume()
+    r_p, shell_volume = aimm.shellVolume()
     pairs_idx_all, n_pairs_arr = [], []
     
     for i in range(len(r_p)):
+        if key == 'mm':
+            filename = 'Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(r_p[i], mass_max)
         if key == 'mm and dv':
-            filename = 'Major_pairs/pairs_idx_r%.1f_mm%d_dv%d.npy'%(i, mass_max, dv_cut)
+            filename = 'Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(r_p[i], mass_max, dz_cut)
         if key == 'dv':
-            filename = 'dv_pairs/pairs_idx_r%.1f_dv%d.npy'%(i, dv_cut)
+            filename = 'dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(r_p[i], dz_cut)
         if key == 'all':
-            filename = 'pairs_idx_r%d.npy'%(i)
+            filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
             
         pairs_idx = np.load(data_dir+filename, allow_pickle=True)
         n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
@@ -147,6 +128,9 @@ def saveTmmFiles(key, dt, arr , redshift_limit = 2):
     Function decides where to save the tmm evaluated files
     """
     if key == 'mm and dv':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+    
+    if key == 'mm':
         np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
         
     if key == 'dv':
@@ -221,15 +205,16 @@ def defineTimeSinceMergeCut2(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, time_since
         
         # if there are more than 'self'-pairs
         if len(p) >= 1:
-            for p_idx in p:                
-                diff_time_pair = diff_t_mm_arr[p_idx]
-                # only consider pairs that pass this time since merger-scale criterion
-                if (diff_time_pair <= time_since_merger) or  (diff_time <= time_since_merger):
-                    t_mm_idx.append(p_idx)
-                    
+            for p_idx in p:
+                if i != p_idx:
+                    diff_time_pair = diff_t_mm_arr[p_idx]
+                    # only consider pairs that pass this time since merger-scale criterion
+                    if (diff_time_pair <= time_since_merger) or  (diff_time <= time_since_merger):
+                        t_mm_idx.append(p_idx)
+
         # save this info for the given halo in the object array
         all_t_mm_idx.append(t_mm_idx)
-    
+        
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
@@ -238,13 +223,15 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2):
     """
     Function to concatenate all the files containing pairs for different T_mm criteria
     """
-    r_p, _, _ = aimm.shellVolume()
+    r_p, _ = aimm.shellVolume()
     n_pairs_t_mm_all = np.zeros( (0, len(r_p) ) )
     
     if key == 'mm and dv':
-        data_dir = 'Data/pairs_z%.1f/Major_pairs/'%redshift_limit
+        data_dir = 'Data/pairs_z%.1f/Major_dv_pairs/'%redshift_limit
     if key == 'dv':
         data_dir = 'Data/pairs_z%.1f/dv_pairs/'%redshift_limit
+    if key == 'mm':
+        data_dir = 'Data/pairs_z%.1f/Major_pairs/'%redshift_limit
     if key == 'all':
         data_dir = 'Data/pairs_z%.1f/'%redshift_limit    
         
@@ -275,12 +262,13 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     num_pairs = all_pairs_vs_rp[1:] - all_pairs_vs_rp[:-1]
     
     # get shell volume and projected radius bins
-    r_p, _, shell_volume = aimm.shellVolume()
+    r_p, shell_volume = aimm.shellVolume()
     
     # normalization
     total_num_pairs = len(hd_obj)    
-    N = 2*total_num_pairs*(total_num_pairs - 1)
+    N = total_num_pairs*(total_num_pairs - 1)
     
+    # fractional number density
     f_pairs = num_pairs/(N*shell_volume)
     return f_pairs, error(num_pairs)
 
@@ -305,23 +293,21 @@ def getAllMMscales(hd_obj, pairs_mm_all, r_p):
         halo_m_scale_arr_all_r.append(halo_m_scale_arr)
     return halo_m_scale_arr_all_r
 
-def getPairIndicies(pairs_idx, r, keyword = ''):
+def getPairIndicies(pairs_idx, r):
     "Function generates an array that holds all the pair indicies"
     pairs_arr = np.zeros((0, 2))
     two_idx = []
     
     # get the indicies of the pair
     for j in range(pairs_idx[r].shape[0]):
-        if keyword == 'all':
-            if len(pairs_idx[r][j]) > 1:
-                for p in pairs_idx[r][j]:
-                    two_idx = [j, p]
+        if len(pairs_idx[r][j]) >= 1:
+            for p in pairs_idx[r][j]:
+                # don't want a pair with itself
+                if j != p: 
+                    two_idx = sorted([j, p])
                     pairs_arr = np.append(pairs_arr, [two_idx], axis=0)
-        else:
-            if len(pairs_idx[r][j]) >= 1:
-                for p in pairs_idx[r][j]:
-                    two_idx = [j, p]
-                    pairs_arr = np.append(pairs_arr, [two_idx], axis=0)
+        
+    pairs_arr = np.unique(pairs_arr, axis=0)
     return pairs_arr
 
 def getHalosWithMaxRcompanion(pairs_mm_all, keyword = 'mm and dv', index_of_max_companion = 7):
@@ -344,131 +330,66 @@ def getHalosWithMaxRcompanion(pairs_mm_all, keyword = 'mm and dv', index_of_max_
     halos_w_pair_lessthan_r = np.unique(np.concatenate(halos_w_pair_lessthan_r, axis=None))
     return halos_w_pair_lessthan_r
 
-def getRedshiftMatchedControl(hd_halo, pairs_all, r, keyword='dv', step_z=0.01, redshift_limit=2):
-    """
-    Function gets the redshift matched control sample for all the pairs at a given separation
-    @hd_halo :: astropy Table file containing all the halos < redshift_limit
-    @pairs_all[0] :: contains all the indicies of the halos in a pair  
-    @returns :: np object containing the indicies of the halos chosen in the 'control sample' for every pair & the corresponding count of the total halos in the control 
-    """
-    # depricated initialition of a list of lists arr ;)
-    z_matched_arr = []
-    
-    # get pair indicies for the given r
-    pairs_arr = getPairIndicies(pairs_all[0], r, keyword = keyword)
-    
-    # get indicies of all halos in a pair with r <~ 80 kpc
-    halos_w_pair_lessthan_r = getHalosWithMaxRcompanion(pairs_all)
-    
-    count_z_matched_bkgs = 0
-    z_arr = hd_halo['redshift_R']
-    
-    # loop over all the pairs at the given separation
-    for pairs in pairs_arr:
-        # match redshifts
-        z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
-        mean_z = (z1 + z2)/2
-        
-        # count all objects in the same redshift bin
-        z_matched = [i for i in range(len(z_arr)) if (mean_z - step_z) < z_arr[i] < (mean_z + step_z) ]
-        
-        # keep all halos in the bin that DO NOT have companions with r <~ 80 kpc
-        keeping_idx = [keep for keep in range(len(z_matched)) if z_matched[keep] not in halos_w_pair_lessthan_r]
-        z_matched = np.array(z_matched)[keeping_idx]
-        
-        # save this useful info that is just found out
-        z_matched_arr.append(z_matched)
-        count_z_matched_bkgs += len(z_matched)
-        
-    z_matched_control = np.array([z_matched_arr, count_z_matched_bkgs], dtype=object)
-    np.save('Data/pairs_z%.1f/control_idx_r%.1f.npy'%(redshift_limit, r), z_matched_control, allow_pickle=True)
-    return
-
-def getMassRatios(pairs_arr, hd_halo):
+def massRatios(pairs, m_arr):
     """
     Function calculates the mass ratio between the pairs
     """
-    mass_ratios = []
-    m_arr = hd_halo['galaxy_SMHMR_mass']
-    
-    for pairs in pairs_arr:
-        # get masses of the pair
-        m1, m2 = m_arr[int(pairs[0])], m_arr[int(pairs[1])]
-        ratio = m1/m2        
-        mass_ratios.append(ratio)
-    return mass_ratios
+    m1, m2 = m_arr[int(pairs[0])], m_arr[int(pairs[1])]
+    return m1/m2
+
+def meanZ(pairs, z_arr):
+    """
+    Function calculates the mean z between the pairs
+    """
+    z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
+    return (z1+z2)/2
 
 
-def getMassMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 6, redshift_limit=2):
+def getMassMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.1):
     """
     Function matches the mass of pairs 'with selection cuts' with those 'with no selections cuts'
     """
-    # depricated initialition of a list of lists arr ;)
-    mass_matched_pair_arr = []
+    m_arr, z_arr = hd_halo['galaxy_SMHMR_mass'], hd_halo['redshift_R']
     
     # get pair indicies for the given r
     pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
     pairs_all_arr = getPairIndicies(pairs_all[0], r, keyword = 'all')
     
-    mass_ratios = getMassRatios(pairs_all_arr, hd_halo)
-    m_arr = hd_halo['galaxy_SMHMR_mass']
+    count_mz_matched_pairs = []
     
-    count_m_matched_pairs = 0
     # loop over all the pairs at the given separation
     for pairs in pairs_selected_arr:
-        # match redshifts
-        m1_selected, m2_selected = m_arr[int(pairs[0])], m_arr[int(pairs[1])]
-        m_ratio = m1_selected/m2_selected
+        count_per_pair = 0
+        # get mass ratio and mean z
+        m_ratio = massRatios(pairs, m_arr)
+        mean_z = meanZ(pairs, z_arr)
         
-        # count all objects in the same mass bin
-        m_matched = [i for i in range(len(pairs_all_arr)) if m_ratio - mr_min <= mass_ratios[i] <= m_ratio + mr_max ]
-        
-        # save this useful info that is just found out
-        mass_matched_pair_arr.append(m_matched)       
-        count_m_matched_pairs += len(m_matched)
-        
-    m_matched_control = np.array([mass_matched_pair_arr, count_m_matched_pairs], dtype=object)
-    np.save('Data/pairs_z%.1f/control_pairs_idx_r%.1f.npy'%(redshift_limit, r), m_matched_control, allow_pickle=True)
-    return
+        # count all halo pairs in the same mass and z bin as the pair
+        for i in pairs_all_arr:
+            mass_condition = (m_ratio - mr_min <= massRatios(pairs, m_arr) <= m_ratio + mr_max)
+            z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
+            # count pairs that pass the conditions
+            if mass_condition and z_condition:
+                count_per_pair += 1
+        count_mz_matched_pairs.append(count_per_pair)
+    np.save('Data/pairs_z%.1f/Major_pairs/control_pairs_idx_r%.1f_mz.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+    return 
 
-def getMeanZforControlPairs(hd_halo, pairs_all_arr, redshift_limit, r):
+def decideBools(keyword = 'all'):
     """
-    Functino to get the z of the control pairs
+    Function decides the values of the booleans based on the keyword
+    @keyword :: keyword decides where to save the file 
+    takes three values -- 
+    @keyword == 'dv' :: only redshift (velocity) criteria
+    @keyword == 'mm and dv' :: major merger and redshift criteria
+    @keyword == 'all' :: considers all pairs (not major merger or redshift cuts)
     """
-    mean_z_arr = []
-    z_arr = hd_halo['redshift_R']
-    
-    # load the chosen mass matched indicies
-    m_matched_control = np.load('Data/pairs_z%.1f/control_pairs_idx_r%.1f.npy'%(redshift_limit, r), allow_pickle=True)
-    
-    for pairs in m_matched_control[0]:
-        # get masses of the pair
-        z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
-        mean_z = (z1 + z2)/2        
-        mean_z_arr.append(mean_z)
-    return mean_z_arr
-
-def getRedshiftMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 6, redshift_limit=2):
-    """
-    Function to match the redshifts of the pairs 
-    """
-    # get pair indicies for the given r
-    pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
-    pairs_all_arr = getPairIndicies(pairs_all[0], r, keyword = 'all')
-    
-    count_z_matched_bkgs = 0
-    z_arr = hd_halo['redshift_R']
-        
-    # for every pair
-    for pairs in pairs_selected_arr:
-        # match redshifts
-        z1, z2 = z_arr[int(pairs_selected_arr[0])], z_arr[int(pairs_selected_arr[1])]
-        mean_z = (z1 + z2)/2
-        
-        # redshift of the 'no selection halo pairs'
-        mean_z_arr = getMeanZforControlPairs(hd_halo, pairs_all_arr, redshift_limit, r)
-        # count all objects in the same redshift bin
-        z_matched = [i for i in range(len(z_arr)) if (mean_z - step_z) < z_arr[i] < (mean_z + step_z) ]
-    
-        # look into the indicies that pass the z criteria
-    return
+    if keyword == 'dv':
+        major_mergers_only, delta_v_cut = False, True
+    if keyword == 'mm':
+        major_mergers_only, delta_v_cut = True, False
+    if keyword == 'mm and dv':
+        major_mergers_only, delta_v_cut = True, True
+    if keyword == 'all':
+        major_mergers_only, delta_v_cut = False, False
+    return major_mergers_only, delta_v_cut 

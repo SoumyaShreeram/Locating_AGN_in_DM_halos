@@ -55,7 +55,7 @@ def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
         ax.set_ylim(ylim)
     
     if legend:
-        l = ax.legend(loc='best',  fontsize=14)
+        l = ax.legend(loc='best',  fontsize=14, frameon=False)
         for legend_handle in l.legendHandles:
             legend_handle._legmarker.set_markersize(12)
             
@@ -65,7 +65,7 @@ def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
 
 def plotFpairs(ax, r_p, f_pairs, f_pairs_err, label, color='r', errorbar = True):
     # changing all unit to kpc
-    r_p_kpc, f_pairs = 1e3*r_p[1:], 1e9*f_pairs
+    r_p_kpc, f_pairs = 1e3*r_p[1:], f_pairs
 
     # plotting the results
     ax.plot( r_p_kpc , f_pairs, 's', ls='--', color=color, label = label)
@@ -100,20 +100,25 @@ def plotScaleMMdistribution(halo_m_scale_arr_all_r, cosmo, dt_m_arr):
     ax.set_yscale('log')
     return
 
-def plotNpSep(ax, hd_z_halo, pairs_all, color, label, errorbars = True):
+def plotNpSep(ax, hd_z_halo, pairs_all, color, label, mec, errorbars = False):
     """
     Function plots the n_p as a function of separation
     """
+    # get shell volume and projected radius bins [Mpc]
+    r_p, shell_volume = aimm.shellVolume()
+    
     # get number density of pairs with and without selection cuts
     n_pairs, n_pairs_err = cswl.nPairsToFracPairs(hd_z_halo, pairs_all[1])
+    good = np.nonzero(n_pairs)[0]
     
     # changing all unit to kpc
-    r_p_kpc, n_pairs =  1e3*r_p[1:], 1e9*n_pairs
+    r_p_kpc, n_pairs =  1e3*r_p[1:][good], n_pairs[good]
     
     # plotting the results
-all_pairs = ax.plot( r_p_kpc , n_pairs, 'd', color=color, label=label)
+    ax.plot( r_p_kpc , n_pairs, 'd', mec = mec, ms = 9, color=color, label=label)
     
     # errorbars
     if errorbars:
+        n_pairs_err = np.array(n_pairs_err)[good]
         ax.errorbar(r_p_kpc , np.array(n_pairs), yerr=n_pairs_err, ecolor='k', fmt='none', capsize=4.5)
     return ax, n_pairs, n_pairs_err
