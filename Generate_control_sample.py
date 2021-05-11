@@ -44,9 +44,8 @@ cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
 h = 0.6777
 
 # get shell volume and projected radius bins [Mpc]
-r_p, dr_p, shell_volume = aimm.shellVolume()
+r_p, shell_volume = aimm.shellVolume()
 
-mass_matched, redshift_matched = True, False
 
 """
 2. Open files and get relevant data
@@ -65,11 +64,7 @@ print("Number of halos: %d"%(len(hd_z_halo) ))
 pairs_all = cswl.openPairsFiles(key = 'all')
 pairs_mm_all = cswl.openPairsFiles(key = 'mm and dv')
 
-if mass_matched:
-    for r in [15]:
-        print('-- r_p = %.2f Mpc --'%r_p[r])
-        cswl.getMassMatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r)
-        
-if redshift_matched:
-    for r in [2]:
-        cswl.getZMatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r)
+for r in [9]:
+    print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+    cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r)
+    

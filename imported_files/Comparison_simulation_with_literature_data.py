@@ -123,22 +123,22 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
         pairs_idx_all.append(pairs_idx)        
     return np.array([pairs_idx_all, n_pairs_arr], dtype=object)
 
-def saveTmmFiles(key, dt, arr , redshift_limit = 2):
+def saveTmmFiles(key, dt, arr , redshift_limit = 2, param='t_mm'):
     """
     Function decides where to save the tmm evaluated files
     """
     if key == 'mm and dv':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
     
     if key == 'mm':
-        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
         
     if key == 'dv':
-        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param,  dt), arr, allow_pickle=True)
 
     # if you want to save all the pairs
     if key == 'all':
-        np.save('Data/pairs_z%.1f/all_pairs_t_mm%.1f.npy'%(redshift_limit, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
     return
 
 
@@ -190,7 +190,7 @@ def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
-def defineTimeSinceMergeCut2(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, time_since_merger = 1, redshift_limit = 2):
+def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param = 0.1, redshift_limit = 2, string_param = 't_mm'):
     """
     Define the time since merger cut 
     """
@@ -209,17 +209,17 @@ def defineTimeSinceMergeCut2(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, time_since
                 if i != p_idx:
                     diff_time_pair = diff_t_mm_arr[p_idx]
                     # only consider pairs that pass this time since merger-scale criterion
-                    if (diff_time_pair <= time_since_merger) or  (diff_time <= time_since_merger):
+                    if (diff_time_pair <= param) or  (diff_time <= param):
                         t_mm_idx.append(p_idx)
 
         # save this info for the given halo in the object array
         all_t_mm_idx.append(t_mm_idx)
         
-    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
+    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = '%s = %d Gyr: '%(string_param, param))
     return all_t_mm_idx, count_t_mm
 
 
-def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2):
+def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
     """
     Function to concatenate all the files containing pairs for different T_mm criteria
     """
@@ -236,8 +236,11 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2):
         data_dir = 'Data/pairs_z%.1f/'%redshift_limit    
         
     for dt_m in dt_m_arr:
-        n_pairs_t_mm = np.load(data_dir+'all_pairs_t_mm%.1f.npy'%(dt_m), allow_pickle=True)
-        
+        if param == 't_mm':
+            n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.1f.npy'%(param, dt_m), allow_pickle=True)
+        if param == 'x_off':
+            n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f.npy'%(param, dt_m), allow_pickle=True)
+            
         # save the counts for all radius bins for a given time since merger
         n_pairs_t_mm_all = np.append(n_pairs_t_mm_all, [n_pairs_t_mm], axis=0)
     return n_pairs_t_mm_all
@@ -254,9 +257,7 @@ def error(n_pairs):
 
 def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     """
-    Function to convert the number of pairs into a fraction
-    @dt_m_idx :: the time since merger array index 
-                --> dt_m_idx = 1 corresponds to 1 Gyr; chosen from [0.5, 1, 2, 3, 4]
+    Function to convert the number of pairs into a fractional number density per shell
     @redshift_limit :: the initial redshift limit set on the sample (needed for opening dir)
     """
     num_pairs = all_pairs_vs_rp[1:] - all_pairs_vs_rp[:-1]
@@ -270,7 +271,7 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     
     # fractional number density
     f_pairs = num_pairs/(N*shell_volume)
-    return f_pairs, error(num_pairs)
+    return f_pairs, error(num_pairs)/(N*shell_volume)
 
 def getAllMMscales(hd_obj, pairs_mm_all, r_p):
     "Function to get the scale of last MM of all the pairs for all radius"
@@ -345,7 +346,7 @@ def meanZ(pairs, z_arr):
     return (z1+z2)/2
 
 
-def getMassMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.1):
+def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.01):
     """
     Function matches the mass of pairs 'with selection cuts' with those 'with no selections cuts'
     """
@@ -353,26 +354,27 @@ def getMassMatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr
     
     # get pair indicies for the given r
     pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
-    pairs_all_arr = getPairIndicies(pairs_all[0], r, keyword = 'all')
+    pairs_all_arr = getPairIndicies(pairs_all[0], r)
     
     count_mz_matched_pairs = []
     
     # loop over all the pairs at the given separation
     for pairs in pairs_selected_arr:
         count_per_pair = 0
-        # get mass ratio and mean z
+        # get mass ratio and mean z of the selection cut pair
         m_ratio = massRatios(pairs, m_arr)
         mean_z = meanZ(pairs, z_arr)
         
-        # count all halo pairs in the same mass and z bin as the pair
+        # count all halo pairs in the same mass and z bin as this pair
         for i in pairs_all_arr:
-            mass_condition = (m_ratio - mr_min <= massRatios(pairs, m_arr) <= m_ratio + mr_max)
+            mass_condition = (m_ratio - mr_min <= massRatios(i, m_arr) <= m_ratio + mr_max)
             z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
+            
             # count pairs that pass the conditions
             if mass_condition and z_condition:
                 count_per_pair += 1
         count_mz_matched_pairs.append(count_per_pair)
-    np.save('Data/pairs_z%.1f/Major_pairs/control_pairs_idx_r%.1f_mz.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+    np.save('Data/pairs_z%.1f/Major_dv_pairs/control_pairs_idx_r%.1f_mz.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
     return 
 
 def decideBools(keyword = 'all'):
