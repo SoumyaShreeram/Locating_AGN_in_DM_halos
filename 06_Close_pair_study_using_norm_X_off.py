@@ -63,7 +63,7 @@ h = 0.6777
 r_p, shell_volume = aimm.shellVolume()
 
 # normalized xoff array 
-xoff_arr = [0.01, 0.05, 0.1, 0.2, 0.4]
+xoff_arr = [0.1, 0.2, 0.4, 0.5, 0.7]
 
 # max mass ratio to classify as a major merger [dimensionless]
 mass_max = 3
@@ -73,7 +73,7 @@ dz_cut =  0.001
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
-keyword = 'all'
+keyword = 'mm and dv'
 
 """
 3. Open files and get relevant data

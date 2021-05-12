@@ -64,7 +64,7 @@ print("Number of halos: %d"%(len(hd_z_halo) ))
 pairs_all = cswl.openPairsFiles(key = 'all')
 pairs_mm_all = cswl.openPairsFiles(key = 'mm and dv')
 
-for r in [9]:
+for r in [15]:
     print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
     cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r)
     

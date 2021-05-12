@@ -66,7 +66,7 @@ r_p, shell_volume = aimm.shellVolume()
 time_since_merger = 5
 
 # time since merger array [Gyr]
-dt_m_arr = [0.5, 1, 2, 3, 4]
+dt_m_arr = [0, 0.5, 1, 2, 3, 4]
 
 # max mass ratio to classify as a major merger [dimensionless]
 mass_max = 3
@@ -80,7 +80,7 @@ run_merger_pairs = True
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
-keyword = 'dv'
+keyword = 'all'
 major_mergers_only, delta_v_cut = cswl.decideBools(keyword = keyword)
 
 """
@@ -153,14 +153,18 @@ if run_merger_pairs:
     pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, key = keyword, dz_cut= dz_cut)
     
     diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+    dt_m_bins_arr = cswl.decideBins(dt_m_arr, np.max(diff_t_mm_arr))
     
-    for dt_m in dt_m_arr[:2]:
+    for i, dt_m in enumerate(dt_m_arr):
         count_t_mm_arr = []
-
-        for r in range(len(r_p)): 
-            print('\n ---- Merger pairs within radius %.2f Mpc, %.1f Gyr ---'%(r_p[r], dt_m))
+        dt_m_bins =  dt_m_bins_arr[i]
         
-            _, count_t_mm = cswl.defineTimeSinceMergeCut2(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, time_since_merger = dt_m, redshift_limit = redshift_limit)
+        # get index number and deicde the lower- upper- limit of Tmm
+                
+        for r in range(len(r_p)): 
+            print('\n ---- Merger pairs within radius %.2f Mpc, %.1f - %.1f Gyr ---'%(r_p[r], dt_m_bins[0], dt_m_bins[1]))
+        
+            _, count_t_mm = cswl.selectParameterPairs(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, param = dt_m_bins, redshift_limit = redshift_limit)
             count_t_mm_arr.append(count_t_mm)
           
-        cswl.saveTmmFiles(keyword, dt_m, arr = count_t_mm_arr, redshift_limit = redshift_limit)
+        cswl.saveTmmFiles(keyword, dt_m_bins, arr = count_t_mm_arr, redshift_limit = redshift_limit)

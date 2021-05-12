@@ -128,17 +128,17 @@ def saveTmmFiles(key, dt, arr , redshift_limit = 2, param='t_mm'):
     Function decides where to save the tmm evaluated files
     """
     if key == 'mm and dv':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
     
     if key == 'mm':
-        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
         
     if key == 'dv':
-        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_%s%.2f.npy'%(redshift_limit, param,  dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param,  dt[0], dt[1]), arr, allow_pickle=True)
 
     # if you want to save all the pairs
     if key == 'all':
-        np.save('Data/pairs_z%.1f/all_pairs_%s%.2f.npy'%(redshift_limit, param, dt), arr, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
     return
 
 
@@ -190,9 +190,17 @@ def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
-def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param = 0.1, redshift_limit = 2, string_param = 't_mm'):
+def decideBins(a, a_max):
+    "Function to decide the upper and lower limits of the bins"
+    diff_a = [a[0:2], a[1:3], a[2:4], a[3:5], a[4:], [a[5], a_max]]
+    
+    return diff_a
+
+
+def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshift_limit = 2, string_param = 't_mm'):
     """
-    Define the time since merger cut 
+    Select pairs that pass the parameter cuts
+    @param :: list with [lower_limit, upper_limit] of the parameter bin
     """
     # object arr to save major pairs for every DM halo
     all_t_mm_idx = []
@@ -208,14 +216,19 @@ def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param = 0.1, r
             for p_idx in p:
                 if i != p_idx:
                     diff_time_pair = diff_t_mm_arr[p_idx]
+                    
                     # only consider pairs that pass this time since merger-scale criterion
-                    if (diff_time_pair <= param) or  (diff_time <= param):
-                        t_mm_idx.append(p_idx)
+                    if string_param == 't_mm':
+                        if (param[0] <= diff_time_pair <= param[1]) or  ( param[0] <= diff_time <= param[1]):
+                            t_mm_idx.append(p_idx)
+                    if string_param == 'x_off':
+                        if (param[0] >= diff_time_pair >= param[1]) or  (param[0] >= diff_time >= param[1]):
+                            t_mm_idx.append(p_idx)
 
         # save this info for the given halo in the object array
         all_t_mm_idx.append(t_mm_idx)
         
-    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = '%s = %d Gyr: '%(string_param, param))
+    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = '%s = %.1f - %.1f Gyr: '%(string_param, param[0], param[1]))
     return all_t_mm_idx, count_t_mm
 
 
@@ -311,26 +324,6 @@ def getPairIndicies(pairs_idx, r):
     pairs_arr = np.unique(pairs_arr, axis=0)
     return pairs_arr
 
-def getHalosWithMaxRcompanion(pairs_mm_all, keyword = 'mm and dv', index_of_max_companion = 7):
-    """
-    Function to get all the halos within the defined radius r_p[index_of_max_companion] (usually 80 kpc)
-    @pairs_mm_all[0] :: list of lists holding indicies of all halos with a companion <r_p[r]
-    @keyword :: can be 'dv' --> redshift selection only
-                'mm and dv' --> major merger and redshift selection
-                'all' --> no selection
-    @index_of_max_companion :: this is the index of the r_p arr 
-                            -->  decides to save companions within r_p[idx]
-    @returns :: unique elements of an (N, 2) array containing idx of all halos with a pairs within r_p[idx]
-    """
-    halos_w_pair_lessthan_r = np.zeros((0,2))
-    
-    for r in range(index_of_max_companion):
-        pairs_arr = getPairIndicies(pairs_mm_all[0], r, keyword = keyword)
-        halos_w_pair_lessthan_r = np.append(halos_w_pair_lessthan_r, pairs_arr, axis=0)
-
-    halos_w_pair_lessthan_r = np.unique(np.concatenate(halos_w_pair_lessthan_r, axis=None))
-    return halos_w_pair_lessthan_r
-
 def massRatios(pairs, m_arr):
     """
     Function calculates the mass ratio between the pairs
@@ -345,13 +338,18 @@ def meanZ(pairs, z_arr):
     z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
     return (z1+z2)/2
 
-
-def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.01):
+def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.01, param = 't_mm'):
     """
     Function matches the mass of pairs 'with selection cuts' with those 'with no selections cuts'
     """
     m_arr, z_arr = hd_halo['galaxy_SMHMR_mass'], hd_halo['redshift_R']
     
+    if param == 't_mm':
+        param_arr =  np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+        step_param = 0.02 # Gyr
+    #else:
+        # neet to figure it out for xoff
+        
     # get pair indicies for the given r
     pairs_selected_arr = getPairIndicies(pairs_selected[0], r)
     pairs_all_arr = getPairIndicies(pairs_all[0], r)
@@ -363,18 +361,19 @@ def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_m
         count_per_pair = 0
         # get mass ratio and mean z of the selection cut pair
         m_ratio = massRatios(pairs, m_arr)
-        mean_z = meanZ(pairs, z_arr)
+        mean_z, mean_param = meanZ(pairs, z_arr), meanZ(pairs, param_arr)
         
         # count all halo pairs in the same mass and z bin as this pair
         for i in pairs_all_arr:
             mass_condition = (m_ratio - mr_min <= massRatios(i, m_arr) <= m_ratio + mr_max)
             z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
+            param_condition =  (mean_param - step_param) < meanZ(i, param_arr) < (mean_param + step_param)
             
             # count pairs that pass the conditions
-            if mass_condition and z_condition:
+            if mass_condition and z_condition and param_condition:
                 count_per_pair += 1
         count_mz_matched_pairs.append(count_per_pair)
-    np.save('Data/pairs_z%.1f/Major_dv_pairs/control_pairs_idx_r%.1f_mz.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+    np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
     return 
 
 def decideBools(keyword = 'all'):

@@ -37,6 +37,9 @@ import seaborn as sns
 import Agn_incidence_from_Major_Mergers as aimm
 import Comparison_simulation_with_literature_data as cswl
 
+
+from scipy.stats import norm
+
 def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
     """
     Function defining plot properties
@@ -165,8 +168,7 @@ def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_
         if param == 't_mm':
             label = r'$t_{\rm MM}$ = %.1f Gyr'%(dt_m_arr[t_idx])
         else:
-            label = r'$\tilde{X}_{\rm off}$ = %.2f'%dt_m_arr[t_idx]
-            
+            label = r'$\tilde{X}_{\rm off}$ = %.1f Gyr'%(dt_m_arr[t_idx])
         ax[0].plot( (1e3*r_p[1:]), (np_mm_dt[1:]/(2*vol)), 'kX', label = label, color=pal[t_idx])
         ax[1].plot( (1e3*r_p[1:]), (np_mm_dv_dt[1:]/(2*vol)), 'kX', color=pal[t_idx])
 
@@ -175,3 +177,23 @@ def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_
     setLabel(ax[0], r'Separation, $r$ [kpc]', 'Cumulative number of halo pairs\n'+r'[Mpc$^{-3}$]', r'Mass ratio 3:1, $\Delta z_{\rm R, S} < 10^{-3}$', 'default', 'default', legend=True)
     setLabel(ax[1], r'Separation, $r$ [kpc]', r'', 'Mass ratio 3:1', 'default', 'default', legend=False)
     return pal
+
+
+def plotParameterDistributions(xoff_all, string=r'$\tilde{X}_{\rm off}$', xmax=5, filestring='xoff'):
+    """
+    Function to plot the parameter distribution i.e. SF and PDF
+    """
+    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    sf_xoff = norm.sf(np.sort(xoff_all))
+    if string == r'$\tilde{X}_{\rm off}$':
+        ax.plot(np.sort(xoff_all), sf_xoff, 'r-', label=r'Survival Function of '+string)
+        xmax = np.max(xoff_all)
+    else:
+        ax.plot(np.sort(xoff_all), 1-sf_xoff, 'r-', label=r'CDF of '+string)
+    
+    pdf_xoff = norm.pdf(np.sort(xoff_all))
+    ax.plot(np.sort(xoff_all), pdf_xoff, 'k-', label=r'PDF of '+string)
+    
+    setLabel(ax, string, 'Distribution of '+string,  '', [np.min(xoff_all), xmax], 'default', legend=True)
+    plt.savefig('figures/'+filestring+'_function.png', facecolor='w', edgecolor='w', bbox_inches='tight')
+    return ax
