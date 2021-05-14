@@ -98,7 +98,7 @@ def indexArray(all_mm_idx):
             idx_arr.append(i)
     return idx_arr
 
-def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001):
+def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, dt_m_bins = [0.5, 1]):
     """
     Function to open all the files with 
     """
@@ -115,6 +115,8 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
             filename = 'dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(r_p[i], dz_cut)
         if key == 'all':
             filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
+        if key == 'mm and dv and tmm':   
+            filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(dt_m_bins[0], dt_m_bins[1], r_p[i], mass_max, dz_cut)
             
         pairs_idx = np.load(data_dir+filename, allow_pickle=True)
         n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
@@ -251,6 +253,8 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
     for dt_m in dt_m_arr:
         if param == 't_mm':
             n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.1f.npy'%(param, dt_m), allow_pickle=True)
+        if param == 't_mm bins':
+            n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f-%.2f.npy'%('t_mm', dt_m[0], dt_m[1]), allow_pickle=True)
         if param == 'x_off':
             n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f.npy'%(param, dt_m), allow_pickle=True)
             
@@ -263,7 +267,7 @@ def error(n_pairs):
     err = []
     for n in n_pairs:
         if n != 0:
-            err.append(1/np.sqrt(n))
+            err.append(np.sqrt(n))
         else:
             err.append(0)
     return err
@@ -283,8 +287,8 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     N = total_num_pairs*(total_num_pairs - 1)
     
     # fractional number density
-    f_pairs = num_pairs/(N*shell_volume)
-    return f_pairs, error(num_pairs)/(N*shell_volume)
+    f_pairs = num_pairs/(N*shell_volume[:len(num_pairs)])
+    return f_pairs, error(num_pairs)/(N*shell_volume[:len(num_pairs)])
 
 def getAllMMscales(hd_obj, pairs_mm_all, r_p):
     "Function to get the scale of last MM of all the pairs for all radius"
@@ -338,7 +342,23 @@ def meanZ(pairs, z_arr):
     z1, z2 = z_arr[int(pairs[0])], z_arr[int(pairs[1])]
     return (z1+z2)/2
 
-def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.01, param = 't_mm'):
+def decideWhereToSaveControlPairs(count_mz_matched_pairs, r, key = 'pairs', redshift_limit =2, dt_m_bins = [0.5, 1.0]):
+    "Function decides where to save the control pairs"
+    if key == 'pairs':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+        
+    if key == 'self_pairs':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+        
+    if key == 'tmm_pairs':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
+        
+    if key == 'tmm_self_pairs':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
+    return
+
+
+def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_max = 2, redshift_limit=2, step_z = 0.01, param = 't_mm', dt_m_bins = [0.5, 1.0], key = 'pairs'):
     """
     Function matches the mass of pairs 'with selection cuts' with those 'with no selections cuts'
     """
@@ -365,15 +385,17 @@ def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_m
         
         # count all halo pairs in the same mass and z bin as this pair
         for i in pairs_all_arr:
-            mass_condition = (m_ratio - mr_min <= massRatios(i, m_arr) <= m_ratio + mr_max)
-            z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
-            param_condition =  (mean_param - step_param) < meanZ(i, param_arr) < (mean_param + step_param)
-            
-            # count pairs that pass the conditions
-            if mass_condition and z_condition and param_condition:
-                count_per_pair += 1
+            if pairs != i:
+                mass_condition = (m_ratio - mr_min <= massRatios(i, m_arr) <= m_ratio + mr_max)
+                z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
+                param_condition =  (mean_param - step_param) < meanZ(i, param_arr) < (mean_param + step_param)
+
+                # count pairs that pass the conditions
+                if mass_condition and z_condition and param_condition:
+                    count_per_pair += 1
         count_mz_matched_pairs.append(count_per_pair)
-    np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+    
+    decideWhereToSaveControlPairs(count_mz_matched_pairs, r, key = key, redshift_limit = redshift_limit, dt_m_bins = dt_m_bins)
     return 
 
 def decideBools(keyword = 'all'):
@@ -394,3 +416,29 @@ def decideBools(keyword = 'all'):
     if keyword == 'all':
         major_mergers_only, delta_v_cut = False, False
     return major_mergers_only, delta_v_cut 
+
+def getRMZ(hd_halo, pairs_mm_dv_all, r):
+    m_arr, z_arr = hd_halo['galaxy_SMHMR_mass'], hd_halo['redshift_R']
+    
+    
+    # no need to get rid of pairs from previous bin for r=0
+    if r == 0: 
+        pairs_selected = getPairIndicies(pairs_mm_dv_all[0], r)
+
+    # for r > 0 we need to get rid of pairs from previous bin
+    if r > 0:
+        pairs_this_bin = getPairIndicies(pairs_mm_dv_all[0], r)
+        pairs_previous_bin = getPairIndicies(pairs_mm_dv_all[0], int(r-1))
+
+        pairs_selected = [current_pair for current_pair in pairs_this_bin if current_pair not in pairs_previous_bin]
+        pairs_selected = np.array(pairs_selected)
+
+    mass_ratios_arr, mean_z_arr = [], []
+
+    for pairs in pairs_selected:
+        mass_ratios_arr.append(massRatios(pairs, m_arr))
+        mean_z_arr.append(meanZ(pairs, z_arr))
+
+    separation_mass_z = np.array([mass_ratios_arr, mean_z_arr], dtype=object)
+    return separation_mass_z
+

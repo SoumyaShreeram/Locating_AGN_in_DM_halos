@@ -116,7 +116,7 @@ def plotNpSep(ax, hd_z_halo, pairs_all, color, label, mec, errorbars = True):
     n_pairs, n_pairs_err = cswl.nPairsToFracPairs(hd_z_halo, pairs_all)
     
     # changing all unit to kpc
-    r_p_kpc, n_pairs =  1e3*r_p[1:], n_pairs
+    r_p_kpc, n_pairs =  1e3*r_p[1:len(n_pairs)+1], n_pairs
     
     # plotting the results
     ax.plot( r_p_kpc , n_pairs, 'd', mec = mec, ms = 10, color=color, label=label)
@@ -140,7 +140,7 @@ def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_all, pairs_dv_all, pair
     ax, n_mm_pairs, n_pairs_mm_err = plotNpSep(ax, hd_z_halo, pairs_mm_all[1], flare[1], r'Mass ratio 3:1', mec[2])
     ax, n_dv_pairs, n_pairs_dv_err = plotNpSep(ax, hd_z_halo, pairs_dv_all[1], flare[2], r'$\Delta z_{R\ and\ S} < 10^{-3} $', mec[1])
     ax, n_mm_dv_pairs, n_pairs_mm_dv_err = plotNpSep(ax, hd_z_halo, pairs_mm_dv_all[1], flare[3], r'Mass ratio 3:1, $\Delta z_{R\ and\ S }  < 10^{-3} $', mec[3])
-    ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  'Control sample', mec[3])
+    ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  r'$M^*, z$ control sample', mec[3])
 
     ax.set_yscale("log")
     setLabel(ax, r'Separation, $r$ [kpc]', r'$n_{\rm halo\ pairs}}$ [Mpc$^{-3}$]', '', 'default', 'default', legend=False)
@@ -148,7 +148,7 @@ def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_all, pairs_dv_all, pair
     
     pairs_arr = np.array([n_pairs, n_mm_pairs, n_dv_pairs, n_mm_dv_pairs, n_mz_control_pairs], dtype=object)
     pairs_arr_err = np.array([n_pairs_err, n_pairs_mm_err, n_pairs_dv_err, n_mz_control_err], dtype=object)
-    return pairs_arr, pairs_arr_err
+    return pairs_arr, pairs_arr_err, ax
 
 def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_dt_all, n_pairs_mm_dv_dt_all, param = 't_mm'):
     """
@@ -197,3 +197,23 @@ def plotParameterDistributions(xoff_all, string=r'$\tilde{X}_{\rm off}$', xmax=5
     setLabel(ax, string, 'Distribution of '+string,  '', [np.min(xoff_all), xmax], 'default', legend=True)
     plt.savefig('figures/'+filestring+'_function.png', facecolor='w', edgecolor='w', bbox_inches='tight')
     return ax
+
+def saveFig(filename):
+    plt.savefig('figures/'+filename, facecolor='w', edgecolor='w', bbox_inches='tight')
+    return
+
+def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2):
+    """
+    Function plots a contour map 
+    @u_pix :: number of pixels in the FOV
+    @Returns :: 2D matrix
+    """
+    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    
+    if isinstance(u_pix, (int, float)):
+        X, Y = np.meshgrid(np.linspace(0, u_pix, u_pix), np.linspace(0, u_pix, u_pix))
+    if isinstance(u_pix, (list, tuple, np.ndarray)): # if FOV is a rectangle
+        X, Y = np.meshgrid(np.linspace(xmin, xmax, u_pix[0]), np.linspace(ymin, ymax, u_pix[1]))
+    
+    plot = ax.contourf(X, Y, matrix_2D, cmap='YlGnBu', origin='image')
+    return ax, plot
