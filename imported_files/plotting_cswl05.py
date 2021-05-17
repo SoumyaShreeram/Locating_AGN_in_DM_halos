@@ -202,18 +202,34 @@ def saveFig(filename):
     plt.savefig('figures/'+filename, facecolor='w', edgecolor='w', bbox_inches='tight')
     return
 
-def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2):
+def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2, ax=None, cmap='YlGnBu'):
     """
     Function plots a contour map 
     @u_pix :: number of pixels in the FOV
     @Returns :: 2D matrix
     """
-    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    if ax == None:
+        fig, ax = plt.subplots(1,1,figsize=(7,6))
     
     if isinstance(u_pix, (int, float)):
         X, Y = np.meshgrid(np.linspace(0, u_pix, u_pix), np.linspace(0, u_pix, u_pix))
     if isinstance(u_pix, (list, tuple, np.ndarray)): # if FOV is a rectangle
         X, Y = np.meshgrid(np.linspace(xmin, xmax, u_pix[0]), np.linspace(ymin, ymax, u_pix[1]))
     
-    plot = ax.contourf(X, Y, matrix_2D, cmap='YlGnBu', origin='image')
+    plot = ax.contourf(X, Y, matrix_2D, cmap=cmap, origin='image')
     return ax, plot
+
+def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$T_{\rm MM} = $'):
+    
+    fig, ax = plt.subplots(2,2,figsize=(15,15))
+
+    ax0, pt0 = plotContour((mz_mat_tmm0[0].shape[1], mz_mat_tmm0[0].shape[0]), mz_mat_tmm0[0], ymin=0.8, ymax=1.3, cmap='terrain', ax=ax[0, 0])
+    ax1, pt1 = plotContour((mz_mat_tmm0[1].shape[1], mz_mat_tmm0[1].shape[0]), mz_mat_tmm0[1], ymin=0., ymax=2, cmap='terrain', ax=ax[1, 0])
+    setLabel(ax[0, 0], '', 'Mass ratio', param+' %.2f - %.2f'%(tmm_bins[0][0], tmm_bins[0][1]), 'default', 'default', legend=False)
+    setLabel(ax[1, 0], r'Separation, $r_p$ [kpc]', 'Mean redshift', '', 'default', 'default', legend=False)
+
+    ax2, pt2 = plotContour((mz_mat_tmm1[0].shape[1], mz_mat_tmm1[0].shape[0]), mz_mat_tmm1[0], ymin=0.8, ymax=1.3, cmap='terrain', ax=ax[0, 1])
+    ax3, pt3 = plotContour((mz_mat_tmm1[1].shape[1], mz_mat_tmm1[1].shape[0]), mz_mat_tmm1[1], ymin=0., ymax=2, cmap='terrain', ax=ax[1, 1])
+    setLabel(ax[0, 1], '', '', param+ ' %.2f - %.2f'%(tmm_bins[1][0], tmm_bins[1][1]), 'default', 'default', legend=False)
+    setLabel(ax[1, 1], r'Separation, $r_p$ [kpc]', '', '', 'default', 'default', legend=False)
+    return

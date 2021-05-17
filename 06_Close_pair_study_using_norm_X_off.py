@@ -62,9 +62,6 @@ h = 0.6777
 # get shell volume and projected radius bins [Mpc]
 r_p, shell_volume = aimm.shellVolume()
 
-# normalized xoff array 
-xoff_arr = [0.1, 0.2, 0.4, 0.5, 0.7]
-
 # max mass ratio to classify as a major merger [dimensionless]
 mass_max = 3
 
@@ -73,7 +70,7 @@ dz_cut =  0.001
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
-keyword = 'mm and dv'
+keyword = 'all'
 
 """
 3. Open files and get relevant data
@@ -86,6 +83,9 @@ hd_z_halo = hd_halo[conditions_halo]
 
 print("Halos: %d"%(len(hd_z_halo) ))
 
+xoff_all = hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir']
+xoff_min, xoff_max = np.min(xoff_all), np.max(xoff_all)
+xoff_arr = [0, 0.1, 0.2, 0.3, 0.4, xoff_max]
 """
 4. Studying the effect of 𝑋̃_off on MM pairs
 
@@ -97,15 +97,19 @@ where 𝑁𝑃 is the number of pairs and 𝑁 is the total number of objects fr
 """
 pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, key = keyword, dz_cut= dz_cut)
     
-xoff_all = hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir']
-
-for xoff in xoff_arr[0:1]:
+xoff_bins_arr = cswl.decideBins(xoff_arr, np.max(xoff_arr))
+    
+for i, xoff in enumerate(xoff_arr[:-1]):
     count_xoff_arr = []
 
     for r in range(len(r_p)): 
-        print('\n ---- Merger pairs within radius %.1f Mpc, Xoff = %.2f ---'%((1e3*r_p[r]), xoff))
+        print('\n ---- Merger pairs within radius %.1f Mpc, Xoff = %.2f - %.2f ---'%((1e3*r_p[r]), xoff_bins_arr[i][0], xoff_bins_arr[i][1]))
 
-        _, count_xoff = cswl.selectParameterPairs(hd_z_halo, pairs_all[0][r], cosmo, xoff_all, param = xoff, redshift_limit = redshift_limit, string_param = 'x_off')
+        all_xoff_idx, count_xoff = cswl.selectParameterPairs(hd_z_halo, pairs_all[0][r], cosmo, xoff_all, param = xoff_bins_arr[i], redshift_limit = redshift_limit, string_param = 'x_off')
         count_xoff_arr.append(count_xoff)
-
-    cswl.saveTmmFiles(keyword, xoff, arr = count_xoff_arr, redshift_limit = redshift_limit, param='x_off')
+        
+        if keyword == 'mm and dv':
+                np.save('Data/pairs_z%.1f/Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, xoff_bins_arr[i][0], xoff_bins_arr[i][1], r_p[r], mass_max, dz_cut), all_xoff_idx, allow_pickle=True)
+                print('\n --- Saved mm and dv file --- ')
+    
+    cswl.saveTmmFiles(keyword, xoff_bins_arr[i], arr = count_xoff_arr, redshift_limit = redshift_limit, param='x_off')

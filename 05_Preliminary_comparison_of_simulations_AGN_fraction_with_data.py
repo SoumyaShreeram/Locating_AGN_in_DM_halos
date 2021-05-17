@@ -80,7 +80,7 @@ run_merger_pairs = True
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
-keyword = 'all'
+keyword = 'mm and dv'
 major_mergers_only, delta_v_cut = cswl.decideBools(keyword = keyword)
 
 """
@@ -164,7 +164,10 @@ if run_merger_pairs:
         for r in range(len(r_p)): 
             print('\n ---- Merger pairs within radius %.2f Mpc, %.1f - %.1f Gyr ---'%(r_p[r], dt_m_bins[0], dt_m_bins[1]))
         
-            _, count_t_mm = cswl.selectParameterPairs(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, param = dt_m_bins, redshift_limit = redshift_limit)
+            all_t_mm_idx, count_t_mm = cswl.selectParameterPairs(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, param = dt_m_bins, redshift_limit = redshift_limit)
             count_t_mm_arr.append(count_t_mm)
-          
-        cswl.saveTmmFiles(keyword, dt_m_bins, arr = count_t_mm_arr, redshift_limit = redshift_limit)
+        
+            if keyword == 'mm and dv':
+                np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1], r_p[r], mass_max, dz_cut), all_t_mm_idx, allow_pickle=True)
+                print('\n --- Saved mm and dv file --- ')
+        #cswl.saveTmmFiles(keyword, dt_m_bins, arr = count_t_mm_arr, redshift_limit = redshift_limit)

@@ -98,7 +98,7 @@ def indexArray(all_mm_idx):
             idx_arr.append(i)
     return idx_arr
 
-def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, dt_m_bins = [0.5, 1]):
+def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, param_bins = [0.5, 1]):
     """
     Function to open all the files with 
     """
@@ -115,8 +115,10 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
             filename = 'dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(r_p[i], dz_cut)
         if key == 'all':
             filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
-        if key == 'mm and dv and tmm':   
-            filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(dt_m_bins[0], dt_m_bins[1], r_p[i], mass_max, dz_cut)
+        if key == 'tmm':   
+            filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
+        if key == 'xoff':   
+            filename = 'Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
             
         pairs_idx = np.load(data_dir+filename, allow_pickle=True)
         n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
@@ -220,13 +222,9 @@ def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshif
                     diff_time_pair = diff_t_mm_arr[p_idx]
                     
                     # only consider pairs that pass this time since merger-scale criterion
-                    if string_param == 't_mm':
-                        if (param[0] <= diff_time_pair <= param[1]) or  ( param[0] <= diff_time <= param[1]):
-                            t_mm_idx.append(p_idx)
-                    if string_param == 'x_off':
-                        if (param[0] >= diff_time_pair >= param[1]) or  (param[0] >= diff_time >= param[1]):
-                            t_mm_idx.append(p_idx)
-
+                    if (param[0] <= diff_time_pair <= param[1]) or  ( param[0] <= diff_time <= param[1]):
+                        t_mm_idx.append(p_idx)
+                    
         # save this info for the given halo in the object array
         all_t_mm_idx.append(t_mm_idx)
         
@@ -256,7 +254,7 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
         if param == 't_mm bins':
             n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f-%.2f.npy'%('t_mm', dt_m[0], dt_m[1]), allow_pickle=True)
         if param == 'x_off':
-            n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f.npy'%(param, dt_m), allow_pickle=True)
+            n_pairs_t_mm = np.load(data_dir+'all_pairs_%s%.2f-%.2f.npy'%(param, dt_m[0], dt_m[1]), allow_pickle=True)
             
         # save the counts for all radius bins for a given time since merger
         n_pairs_t_mm_all = np.append(n_pairs_t_mm_all, [n_pairs_t_mm], axis=0)
@@ -267,7 +265,7 @@ def error(n_pairs):
     err = []
     for n in n_pairs:
         if n != 0:
-            err.append(np.sqrt(n))
+            err.append(1/np.sqrt(n))
         else:
             err.append(0)
     return err
@@ -418,6 +416,9 @@ def decideBools(keyword = 'all'):
     return major_mergers_only, delta_v_cut 
 
 def getRMZ(hd_halo, pairs_mm_dv_all, r):
+    """
+    Function gets the mass ratio and redshift distribution for the pairs
+    """
     m_arr, z_arr = hd_halo['galaxy_SMHMR_mass'], hd_halo['redshift_R']
     
     
@@ -440,5 +441,59 @@ def getRMZ(hd_halo, pairs_mm_dv_all, r):
         mean_z_arr.append(meanZ(pairs, z_arr))
 
     separation_mass_z = np.array([mass_ratios_arr, mean_z_arr], dtype=object)
-    return separation_mass_z
+    return separation_mass_z, np.unique(pairs_selected)
 
+def getNonCumulative(n_pairs_dt_all):
+    "Function to get the no cumulative pairs"
+    for i in np.arange(1, len(n_pairs_dt_all)):
+        n_pairs_dt_all[i, :] = n_pairs_dt_all[i, :] - n_pairs_dt_all[i-1, :]
+    return n_pairs_dt_all
+
+def getMassRatioMeanZpairs(hd_z_halo, pairs_all, r_p, generate_mz_mat = True, bins = 25, m_ratio_min = 0.79, m_ratio_max = 1.3, mean_z_min = 0.03,  mean_z_max = 1.9, param='all'):
+    """
+    Function to get the mass and
+    """
+    if generate_mz_mat:
+        m_bin_edges = np.linspace(m_ratio_min, m_ratio_max, bins)
+        z_bin_edges = np.linspace(mean_z_min, mean_z_max, bins)
+
+        # create a 2d matrix to do a contour plot
+        mass_mat_2d = np.zeros(( bins-1, len(r_p) ) )
+        z_mat_2d = np.zeros(( bins-1, len(r_p) ) )
+        pairs_idx_all = []
+        for r in range(len(r_p)):
+            r_m_z_arr, pairs_idx = getRMZ(hd_z_halo, pairs_all, r) 
+            pairs_idx_all.append(pairs_idx)
+            
+            # extract the mass ratio and mean z arrays
+            m_arr, z_arr = r_m_z_arr
+
+            counts_m_arr, m_bin_edges = np.histogram(m_arr, bins=m_bin_edges)
+            counts_z_arr, z_bin_edges = np.histogram(z_arr, bins=z_bin_edges)
+
+            mass_mat_2d[:, r] = counts_m_arr
+            z_mat_2d[:, r] = counts_z_arr
+
+        np.save('Data/mz_mat_%s.npy'%param, np.array([mass_mat_2d, z_mat_2d], dtype=object),allow_pickle=True)
+        mz_mat = np.array([mass_mat_2d, z_mat_2d], dtype=object)
+    else:
+        mz_mat = np.load('Data/mz_mat.npy',allow_pickle=True)
+        mass_mat_2d, z_mat_2d = mz_mat[0], mz_mat[1]
+    return mz_mat, pairs_idx_all
+
+def convertPairIdxIntoHaloIdx(pairs):
+    unique_halo_indicies = []
+    for p in pairs:
+        halo_idx = []
+        # concatenate the halo indicies accross all radius
+        halo_idx = np.concatenate(p, axis=None)
+
+        # choose the unique indices alone
+        halo_idx = np.unique(halo_idx)
+
+        # save these unique indicies for each case of selection criteria
+        unique_halo_indicies.append(halo_idx)
+
+    unique_halo_indicies = np.concatenate(unique_halo_indicies, axis=None)
+    unique_halo_indicies = np.unique(unique_halo_indicies)
+    return unique_halo_indicies

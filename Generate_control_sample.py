@@ -46,6 +46,10 @@ h = 0.6777
 # get shell volume and projected radius bins [Mpc]
 r_p, shell_volume = aimm.shellVolume()
 
+# time since merger array [Gyr]
+dt_m_arr = [0, 0.5, 1, 2, 3, 4]
+key = 'tmm_pairs'  # 'tmm_self_pairs', 'self_pairs', 'pairs'
+
 
 """
 2. Open files and get relevant data
@@ -61,10 +65,54 @@ print("Number of halos: %d"%(len(hd_z_halo) ))
 """
 3. Generate control samples
 """
-pairs_all = cswl.openPairsFiles(key = 'all')
-pairs_mm_all = cswl.openPairsFiles(key = 'mm and dv')
-
-for r in [15]:
-    print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
-    cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r)
+if key == 'tmm_pairs':
+    # load all the priorly calculated tmm, generate the bins
+    diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+    dt_m_bins_arr = cswl.decideBins(dt_m_arr, np.max(diff_t_mm_arr))
     
+    # load pairs for the chosen bin
+    dt_m_bins = dt_m_bins_arr[0]
+    pairs_all = cswl.openPairsFiles(key = 'all')
+    pairs_selected = cswl.openPairsFiles(key = 'mm and dv and tmm')
+    
+    # generate control sample for every case of radii
+    for r in [10, 11, 12, 13, 14, 15]:
+        print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+        cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_selected, r=r, dt_m_bins=dt_m_bins, key=key)
+
+        
+        
+if key == 'tmm_self_pairs':
+    # load all the priorly calculated tmm, generate the bins
+    diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+    dt_m_bins_arr = cswl.decideBins(dt_m_arr, np.max(diff_t_mm_arr))
+    
+    # load pairs for the chosen bin
+    dt_m_bins = dt_m_bins_arr[0]
+    pairs_selected = cswl.openPairsFiles(key = 'mm and dv and tmm')
+    
+    # generate control sample for every case of radii
+    for r in [0]:
+        print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+        cswl.getMZmatchedPairs(hd_z_halo, pairs_selected, pairs_selected, r=r, dt_m_bins=dt_m_bins, key=key)
+        
+
+        
+if key == 'self_pairs':
+    pairs_mm_all = cswl.openPairsFiles(key = 'mm and dv')
+
+    for r in [0, 1, 2, 3]:
+        print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+        cswl.getMZmatchedPairs(hd_z_halo, pairs_mm_all, pairs_mm_all, r=r, key=key)
+
+        
+        
+if key == 'pairs':
+    pairs_all = cswl.openPairsFiles(key = 'all')
+    pairs_mm_all = cswl.openPairsFiles(key = 'mm and dv')
+
+    for r in [0, 1, 2, 3]:
+        print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+        cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r, key=key)
+
+
