@@ -50,10 +50,10 @@ def getErr(x_err_arr, x, y_err_arr, y):
 def powerLaw(beta, x):
     return  -beta[0]/np.power(x, beta[1])
 
-def performODR(X, Y, xerr_all, yerr_all):
+def performODR(X, Y, xerr_all, yerr_all, func=powerLaw):
     "Function to fit the empirical data"
     # model object
-    power_law_model = odr.Model(powerLaw)
+    power_law_model = odr.Model(func)
 
     # data and reverse data object
     data = odr.RealData(X, Y, sx=xerr_all, sy=yerr_all)

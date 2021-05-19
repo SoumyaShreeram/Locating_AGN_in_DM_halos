@@ -20,7 +20,7 @@ from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 import numpy as np
 import Agn_incidence_from_Major_Mergers as aimm
-
+from scipy.stats import gaussian_kde
 
 def countSelectedPairs(all_selected_idx, print_msg = True, string = 'Major merger cut: '):
     """
@@ -117,6 +117,9 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
             filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
         if key == 'tmm':   
             filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
+        if key == 'selection':
+            filename = 'Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(r_p[i], mass_max, dz_cut)
+            
         if key == 'xoff':   
             filename = 'Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
             
@@ -449,7 +452,7 @@ def getNonCumulative(n_pairs_dt_all):
         n_pairs_dt_all[i, :] = n_pairs_dt_all[i, :] - n_pairs_dt_all[i-1, :]
     return n_pairs_dt_all
 
-def getMassRatioMeanZpairs(hd_z_halo, pairs_all, r_p, generate_mz_mat = True, bins = 25, m_ratio_min = 0.79, m_ratio_max = 1.3, mean_z_min = 0.03,  mean_z_max = 1.9, param='all'):
+def getMassRatioMeanZpairs(hd_z_halo, pairs_all, r_p, generate_mz_mat = True, bins = 25, m_ratio_min = 0.79, m_ratio_max = 1.3, mean_z_min = 0.03,  mean_z_max = 1.9, param='all', redshift_limit=2):
     """
     Function to get the mass and
     """
@@ -475,10 +478,11 @@ def getMassRatioMeanZpairs(hd_z_halo, pairs_all, r_p, generate_mz_mat = True, bi
             z_mat_2d[:, r] = counts_z_arr
 
         np.save('Data/mz_mat_%s.npy'%param, np.array([mass_mat_2d, z_mat_2d], dtype=object),allow_pickle=True)
+        np.save('Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), pairs_idx_all, allow_pickle=True)
         mz_mat = np.array([mass_mat_2d, z_mat_2d], dtype=object)
     else:
         mz_mat = np.load('Data/mz_mat.npy',allow_pickle=True)
-        mass_mat_2d, z_mat_2d = mz_mat[0], mz_mat[1]
+        pairs_idx_all = np.load('Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), allow_pickle=True)
     return mz_mat, pairs_idx_all
 
 def convertPairIdxIntoHaloIdx(pairs):
@@ -497,3 +501,50 @@ def convertPairIdxIntoHaloIdx(pairs):
     unique_halo_indicies = np.concatenate(unique_halo_indicies, axis=None)
     unique_halo_indicies = np.unique(unique_halo_indicies)
     return unique_halo_indicies
+
+def gaussianKde2D(a, b):
+    "Generates the Gaussian kde"
+    X, Y = np.mgrid[np.min(a):np.max(a):100j, np.min(b):np.max(b):100j]
+    
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    
+    values = np.vstack([a, b])
+    
+    kernel = gaussian_kde(values)
+    Z = np.reshape(kernel(positions).T, X.shape)
+    return Z
+
+
+def selectionHalos(hd_z_halo, diff_t_mm_arr,  xoff_min=0.2, xoff_max=0.3, tmm_min=1, tmm_max=3):
+    xoff_condition = (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] > xoff_min) & (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] < xoff_max)
+    tmm_condition = ( diff_t_mm_arr >  tmm_min ) & (diff_t_mm_arr <  tmm_max )
+
+    total_conditions = xoff_condition & tmm_condition
+    return total_conditions
+
+def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max=3, dz_cut=0.001):
+    """
+    Function to decide where to save the separation indicies
+    """
+    if keyword == 'mm':
+            np.save('Data/pairs_z%.1f/Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(redshift_limit, r, mass_max), all_idx, allow_pickle=True)
+            print('\n --- Saved mm and dv file --- ')
+         
+    if keyword == 'mm and dv':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
+        print('\n --- Saved mm and dv file --- ')
+
+    if keyword == 'dv':
+        np.save('Data/pairs_z%.1f/dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(redshift_limit, r, dz_cut), all_idx, allow_pickle=True)
+        print('\n --- Saved dv file --- ')
+
+    # if you want to save all the pairs
+    if keyword == 'all':
+        np.save('Data/pairs_z%.1f/pairs_idx_r%0.3f.npy'%(redshift_limit, r), all_idx, allow_pickle=True)
+        print('\n --- Saved no cuts file --- ')
+        
+    if keyword == 'selection':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
+        print('\n --- Saved mm and dv selected files --- ')
+
+    return

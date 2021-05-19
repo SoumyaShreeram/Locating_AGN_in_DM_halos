@@ -75,8 +75,8 @@ mass_max = 3
 dz_cut =  0.001
 
 # BOOLEAN: if the pairs have already been computed before
-run_find_pairs = False
-run_merger_pairs = True
+run_find_pairs = True
+run_merger_pairs = False
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
@@ -91,8 +91,15 @@ _, hd_halo, _ = edh.getHeaders(pixel_no, np.array([ 'halo']))
 # Extracting positions and redshifts of the halos
 _, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
 hd_halo_z = hd_halo[conditions_halo]
-
 print("Halos: %d"%(len(hd_halo_z) ))
+
+
+# after tmm and xoff conditions
+diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+total_conditions = cswl.selectionHalos(hd_halo_z, diff_t_mm_arr, xoff_min=0.1, xoff_max=0.2)
+hd_halo_z = hd_halo_z[total_conditions]
+print("AGNs: %d"%(len(hd_halo_z)) )
+
 
 """
 3. Finding halo pairs
@@ -122,22 +129,7 @@ if run_find_pairs:
             all_mm_idx, count_major_pairs = cswl.majorMergerSelection(hd_halo_z, all_idx, keyword=keyword)
             
         # save file based on the criteria applied     
-        if keyword == 'mm':
-            np.save('Data/pairs_z%.1f/Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(redshift_limit, r_p[r], mass_max), all_mm_idx, allow_pickle=True)
-            print('\n --- Saved mm and dv file --- ')
-         
-        if keyword == 'mm and dv':
-            np.save('Data/pairs_z%.1f/Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r_p[r], mass_max, dz_cut), all_mm_dv_idx, allow_pickle=True)
-            print('\n --- Saved mm and dv file --- ')
-            
-        if keyword == 'dv':
-            np.save('Data/pairs_z%.1f/dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(redshift_limit, r_p[r], dz_cut), all_dv_idx, allow_pickle=True)
-            print('\n --- Saved dv file --- ')
-            
-        # if you want to save all the pairs
-        if keyword == 'all':
-            np.save('Data/pairs_z%.1f/pairs_idx_r%0.3f.npy'%(redshift_limit, r_p[r]), all_mm_idx, allow_pickle=True)
-            print('\n --- Saved no cuts file --- ')
+        cswl.saveSeparationIndicies(all_idx, r_p[r], keyword='selection')
             
 """
 4. Studying the effect of Δ𝑡_merger on MM pairs

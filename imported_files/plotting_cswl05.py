@@ -198,6 +198,18 @@ def plotParameterDistributions(xoff_all, string=r'$\tilde{X}_{\rm off}$', xmax=5
     plt.savefig('figures/'+filestring+'_function.png', facecolor='w', edgecolor='w', bbox_inches='tight')
     return ax
 
+def axId(i):
+    if i == 0: m, n = 0, 0
+    if i == 1: m, n = 0, 1
+    if i == 2: m, n = 1, 0
+    if i == 3: m, n = 1, 1
+    return int(m), int(n)
+
+def plotPdf(ax, arr, string, color):
+    pdf_arr = norm.pdf(np.sort(arr))
+    ax.plot(np.sort(arr), pdf_arr, '-', color=color, label=r'PDF of '+string, lw=4)
+    return
+
 def saveFig(filename):
     plt.savefig('figures/'+filename, facecolor='w', edgecolor='w', bbox_inches='tight')
     return
@@ -219,6 +231,15 @@ def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2, ax=None, cm
     plot = ax.contourf(X, Y, matrix_2D, cmap=cmap, origin='image')
     return ax, plot
 
+def labelMZTmmXoff(ax, ylabel, redshift_limit=2):
+    setLabel(ax[0, 0], r'Stellar mass, $\log{M^*}$', ylabel, '', 'default', 'default', legend=False)
+    setLabel(ax[0, 1], 'Redshift, $z$', '', '', [0, redshift_limit], 'default', legend=False)
+    setLabel(ax[1, 0], r'$T_{\rm MM}$', ylabel, '', 'default', 'default', legend=False)
+    ax[1,0].set_xscale('log')
+
+    setLabel(ax[1, 1], r'$\tilde{X}_{\rm off}$', '', '', 'default', 'default', legend=False)
+    return
+
 def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$T_{\rm MM} = $'):
     
     fig, ax = plt.subplots(2,2,figsize=(15,15))
@@ -233,3 +254,59 @@ def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$T_{\rm M
     setLabel(ax[0, 1], '', '', param+ ' %.2f - %.2f'%(tmm_bins[1][0], tmm_bins[1][1]), 'default', 'default', legend=False)
     setLabel(ax[1, 1], r'Separation, $r_p$ [kpc]', '', '', 'default', 'default', legend=False)
     return
+
+def snsPlotLabels():
+    plt.xlabel(r'$T_{\rm MM}$ [Gyr]', fontsize=20)
+    plt.ylabel(r'$\tilde{X}_{\rm off}$', fontsize=20)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    return
+
+def plotGaussianKde(param_arr, Z, string, i, j, set_xy_lim=True):
+    xmin, xmax = np.min(param_arr[i]), np.max(param_arr[i])
+    ymin, ymax = np.min(param_arr[j]), np.max(param_arr[j])
+
+    fig, ax = plt.subplots(1,1,figsize=(5, 5))
+    ax.plot(param_arr[i], param_arr[j], 'k.', markersize=.02)
+
+    ax.imshow(np.rot90(Z), cmap=plt.cm.gist_earth_r, extent=[xmin, xmax, ymin, ymax])
+    if set_xy_lim:
+        ax.set_xlim([xmin, xmax])
+        ax.set_ylim([ymin, ymax])
+
+    
+    setLabel(ax, string[i], string[j], '', 'default', 'default', legend=False)
+    return ax
+
+
+def plotModelResults(ax, hd_halo, hd_agn_halo,pairs_all, pairs_selected, num_mm_control_pairs, vol, wrt_all_pairs = False):
+    # get shell volume and projected radius bins [Mpc]
+    r_p, shell_volume = aimm.shellVolume()
+
+    #  plotting the cumulative pairs
+    norm_all, norm_selected = vol*len(hd_halo), vol*len(hd_agn_halo)
+    np_all, np_selected = pairs_all[1]/norm_all, pairs_selected[1]/norm_selected    
+
+    ax[0].plot( (1e3*r_p), (np_selected), 'rX', ls = '--', ms=9, label='Selected pairs')
+    ax[0].plot( (1e3*r_p), (np_all), 'kX', ls = '--', label = 'All pairs', ms = 9)
+
+    setLabel(ax[0], r'', r'Cumulative $n_{\rm halo\ pairs}}$  [Mpc$^{-3}$]', '', 'default', 'default', legend=True)
+    
+    # plotting the pairs in bins of radius 
+    np_all_bins, np_all_bins_err = cswl.nPairsToFracPairs(hd_halo, pairs_all[1])
+    np_selected_bins, np_selected_bins_err = cswl.nPairsToFracPairs(hd_agn_halo, pairs_selected[1])
+
+    _ = plotFpairs(ax[1], r_p, np_all_bins, np_all_bins_err, label = 'All pairs', color='k')
+    _ = plotFpairs(ax[1], r_p, np_selected_bins, np_selected_bins_err, label = 'Selected pairs')
+
+    setLabel(ax[1], r'', r'$n_{\rm halo\ pairs}}$  [Mpc$^{-3}$]', '', 'default', 'default', legend=True)
+    
+    # plotting the pairs in bins with respect to the control
+    np_control_bins, np_control_bins_err = cswl.nPairsToFracPairs(hd_halo, np.array(num_mm_control_pairs))
+    
+    if wrt_all_pairs:
+        _ = plotFpairs(ax[2], r_p, np_selected_bins/np_all_bins, np_selected_bins_err, label='wrt all pairs', color='orange')
+    _ = plotFpairs(ax[2], r_p, np_selected_bins/np_control_bins, np_selected_bins_err, label='wrt Control', color='b')
+    setLabel(ax[2], r'Separation, $r$ [kpc]', r'Fraction of pairs, $f_{\rm halo\ pairs}}$ ', '', 'default', 'default', legend=False)
+
+    return np_selected_bins/np_control_bins
