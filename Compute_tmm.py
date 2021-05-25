@@ -33,7 +33,7 @@ import Comparison_simulation_with_literature_data as cswl
 1. Defining input parameters
 """
 # look back into redshifts until...
-redshift_limit = 1.0
+redshift_limit = 0.2
 
 # pixel number from the simulation file
 pixel_no = '000000'
@@ -41,12 +41,6 @@ pixel_no = '000000'
 # Define cosmology used in the notebook
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
 h = 0.6777
-
-# get shell volume and projected radius bins [Mpc]
-r_p, dr_p, shell_volume = aimm.shellVolume()
-
-# time since merger array [Gyr]
-dt_m_arr = [0.5, 1, 2, 3, 4]
 
 
 """
@@ -65,7 +59,7 @@ print("Halos: %d"%(len(hd_z_halo) ))
 """
 diff_t_mm_arr = []
 
-for i in range(len(hd_halo)):
+for i in range(len(hd_z_halo)):
     print('-- ', i, ' --')
     diff_t_mm = cswl.calTmm(cosmo, hd_z_halo[i]['HALO_scale_of_last_MM'], hd_z_halo[i]['redshift_R'])
         

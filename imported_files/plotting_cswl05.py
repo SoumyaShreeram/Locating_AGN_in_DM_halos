@@ -127,7 +127,7 @@ def plotNpSep(ax, hd_z_halo, pairs_all, color, label, mec, errorbars = True):
         ax.errorbar(r_p_kpc , np.array(n_pairs), yerr=n_pairs_err, ecolor=mec, fmt='none', capsize=4.5)
     return ax, n_pairs, n_pairs_err
 
-def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_all, pairs_dv_all, pairs_mm_dv_all, num_mm_control_pairs):
+def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_dv_all, pairs_selected_all):
     """
     Function to plot the fractional number density of pairs for different selection criteria
     """
@@ -137,17 +137,17 @@ def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_all, pairs_dv_all, pair
 
     # plotting the 4 cases with the 4 different cuts
     ax, n_pairs, n_pairs_err = plotNpSep(ax, hd_z_halo, pairs_all[1], 'k', 'All pairs', mec[0]) 
-    ax, n_mm_pairs, n_pairs_mm_err = plotNpSep(ax, hd_z_halo, pairs_mm_all[1], flare[1], r'Mass ratio 3:1', mec[2])
-    ax, n_dv_pairs, n_pairs_dv_err = plotNpSep(ax, hd_z_halo, pairs_dv_all[1], flare[2], r'$\Delta z_{R\ and\ S} < 10^{-3} $', mec[1])
+    #ax, n_mm_pairs, n_pairs_mm_err = plotNpSep(ax, hd_z_halo, pairs_mm_all[1], flare[1], r'Mass ratio 3:1', mec[2])
     ax, n_mm_dv_pairs, n_pairs_mm_dv_err = plotNpSep(ax, hd_z_halo, pairs_mm_dv_all[1], flare[3], r'Mass ratio 3:1, $\Delta z_{R\ and\ S }  < 10^{-3} $', mec[3])
-    ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  r'$M^*, z$ control sample', mec[3])
+    ax, n_selected_pairs, n_selected_err = plotNpSep(ax, hd_z_halo, pairs_selected_all[1], flare[2], r'Mass ratio 3:1, $\Delta z_{R\ and\ S} < 10^{-3}$,'+'\n'+r' $t_{\rm MM} \in [1-3]$ Gyr, $\tilde{X}_{\rm off} \in [0.1, 0.2]$', mec[1])
+    #ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  r'$M^*, z$ control sample', mec[3])
 
     ax.set_yscale("log")
     setLabel(ax, r'Separation, $r$ [kpc]', r'$n_{\rm halo\ pairs}}$ [Mpc$^{-3}$]', '', 'default', 'default', legend=False)
     ax.legend(bbox_to_anchor=(1.05, 1),  loc='upper left', fontsize=14, frameon=False)
     
-    pairs_arr = np.array([n_pairs, n_mm_pairs, n_dv_pairs, n_mm_dv_pairs, n_mz_control_pairs], dtype=object)
-    pairs_arr_err = np.array([n_pairs_err, n_pairs_mm_err, n_pairs_dv_err, n_mz_control_err], dtype=object)
+    pairs_arr = np.array([n_pairs, n_mm_dv_pairs, n_selected_pairs], dtype=object)
+    pairs_arr_err = np.array([n_pairs_err, n_pairs_mm_dv_err, n_selected_err], dtype=object)
     return pairs_arr, pairs_arr_err, ax
 
 def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_dt_all, n_pairs_mm_dv_dt_all, param = 't_mm'):
@@ -158,7 +158,7 @@ def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_
     r_p, _ = aimm.shellVolume()
 
     fig, ax = plt.subplots(1,2,figsize=(17,6))
-    pal = sns.color_palette("hls", len(dt_m_arr)+1).as_hex()
+    pal = sns.color_palette("coolwarm", len(dt_m_arr)+1).as_hex()
 
     ax[0].plot( (1e3*r_p[1:]), (pairs_mm_all[1][1:]/(2*vol)), 'X', color='k', label='No criterion')
     ax[1].plot( (1e3*r_p[1:]), (pairs_mm_dv_all[1][1:]/(2*vol)), 'X', color='k', label='No criterion')
@@ -166,16 +166,17 @@ def plotCumulativeDist(vol, dt_m_arr, pairs_mm_all, pairs_mm_dv_all, n_pairs_mm_
     for t_idx in range(len(dt_m_arr)):
         np_mm_dt, np_mm_dv_dt = n_pairs_mm_dt_all[t_idx], n_pairs_mm_dv_dt_all[t_idx]    
         if param == 't_mm':
-            label = r'$t_{\rm MM}$ = %.1f Gyr'%(dt_m_arr[t_idx])
+            label = r'$t_{\rm MM} \in$ %.1f-%.1f Gyr'%(dt_m_arr[t_idx][0], dt_m_arr[t_idx][1])
         else:
-            label = r'$\tilde{X}_{\rm off}$ = %.1f Gyr'%(dt_m_arr[t_idx])
+            label = r'$\tilde{X}_{\rm off} \in$ %.1f-%.1f Gyr'%(dt_m_arr[t_idx][0], dt_m_arr[t_idx][1])
         ax[0].plot( (1e3*r_p[1:]), (np_mm_dt[1:]/(2*vol)), 'kX', label = label, color=pal[t_idx])
         ax[1].plot( (1e3*r_p[1:]), (np_mm_dv_dt[1:]/(2*vol)), 'kX', color=pal[t_idx])
 
     ax[0].set_yscale('log')
     ax[1].set_yscale('log')
-    setLabel(ax[0], r'Separation, $r$ [kpc]', 'Cumulative number of halo pairs\n'+r'[Mpc$^{-3}$]', r'Mass ratio 3:1, $\Delta z_{\rm R, S} < 10^{-3}$', 'default', 'default', legend=True)
+    setLabel(ax[0], r'Separation, $r$ [kpc]', 'Cumulative number of halo pairs\n'+r'[Mpc$^{-3}$]', r'Mass ratio 3:1, $\Delta z_{\rm R, S} < 10^{-3}$', 'default', 'default', legend=False)
     setLabel(ax[1], r'Separation, $r$ [kpc]', r'', 'Mass ratio 3:1', 'default', 'default', legend=False)
+    ax[0].legend(bbox_to_anchor=(-0.5, -0.7), loc='lower left', ncol=4, frameon=False)
     return pal
 
 
@@ -234,13 +235,13 @@ def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2, ax=None, cm
 def labelMZTmmXoff(ax, ylabel, redshift_limit=2):
     setLabel(ax[0, 0], r'Stellar mass, $\log{M^*}$', ylabel, '', 'default', 'default', legend=False)
     setLabel(ax[0, 1], 'Redshift, $z$', '', '', [0, redshift_limit], 'default', legend=False)
-    setLabel(ax[1, 0], r'$T_{\rm MM}$', ylabel, '', 'default', 'default', legend=False)
+    setLabel(ax[1, 0], r'$t_{\rm MM}$', ylabel, '', 'default', 'default', legend=False)
     ax[1,0].set_xscale('log')
 
     setLabel(ax[1, 1], r'$\tilde{X}_{\rm off}$', '', '', 'default', 'default', legend=False)
     return
 
-def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$T_{\rm MM} = $'):
+def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$t_{\rm MM} = $'):
     
     fig, ax = plt.subplots(2,2,figsize=(15,15))
 
@@ -256,7 +257,7 @@ def plotBinsMZdistribution(mz_mat_tmm0, mz_mat_tmm1, tmm_bins, param=r'$T_{\rm M
     return
 
 def snsPlotLabels():
-    plt.xlabel(r'$T_{\rm MM}$ [Gyr]', fontsize=20)
+    plt.xlabel(r'$t_{\rm MM}$ [Gyr]', fontsize=20)
     plt.ylabel(r'$\tilde{X}_{\rm off}$', fontsize=20)
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -279,13 +280,16 @@ def plotGaussianKde(param_arr, Z, string, i, j, set_xy_lim=True):
     return ax
 
 
-def plotModelResults(ax, hd_halo, hd_agn_halo,pairs_all, pairs_selected, num_mm_control_pairs, vol, wrt_all_pairs = False):
+def plotModelResults(ax, hd_halo, pairs_all, pairs_selected, vol):
+    """
+    Plots the models generated for bins of tmm and xmm
+    """
     # get shell volume and projected radius bins [Mpc]
     r_p, shell_volume = aimm.shellVolume()
 
     #  plotting the cumulative pairs
-    norm_all, norm_selected = vol*len(hd_halo), vol*len(hd_agn_halo)
-    np_all, np_selected = pairs_all[1]/norm_all, pairs_selected[1]/norm_selected    
+    norm = vol*len(hd_halo)
+    np_all, np_selected = pairs_all/norm, pairs_selected[1]/norm    
 
     ax[0].plot( (1e3*r_p), (np_selected), 'rX', ls = '--', ms=9, label='Selected pairs')
     ax[0].plot( (1e3*r_p), (np_all), 'kX', ls = '--', label = 'All pairs', ms = 9)
@@ -293,20 +297,17 @@ def plotModelResults(ax, hd_halo, hd_agn_halo,pairs_all, pairs_selected, num_mm_
     setLabel(ax[0], r'', r'Cumulative $n_{\rm halo\ pairs}}$  [Mpc$^{-3}$]', '', 'default', 'default', legend=True)
     
     # plotting the pairs in bins of radius 
-    np_all_bins, np_all_bins_err = cswl.nPairsToFracPairs(hd_halo, pairs_all[1])
-    np_selected_bins, np_selected_bins_err = cswl.nPairsToFracPairs(hd_agn_halo, pairs_selected[1])
+    np_all_bins, np_all_bins_err = cswl.nPairsToFracPairs(hd_halo, pairs_all)
+    np_selected_bins, np_selected_bins_err = cswl.nPairsToFracPairs(hd_halo, pairs_selected[1])
 
     _ = plotFpairs(ax[1], r_p, np_all_bins, np_all_bins_err, label = 'All pairs', color='k')
     _ = plotFpairs(ax[1], r_p, np_selected_bins, np_selected_bins_err, label = 'Selected pairs')
-
+    ax[1].set_yscale('log')
     setLabel(ax[1], r'', r'$n_{\rm halo\ pairs}}$  [Mpc$^{-3}$]', '', 'default', 'default', legend=True)
     
     # plotting the pairs in bins with respect to the control
-    np_control_bins, np_control_bins_err = cswl.nPairsToFracPairs(hd_halo, np.array(num_mm_control_pairs))
+    _ = plotFpairs(ax[2], r_p, np_selected_bins/np_all_bins, np_selected_bins_err, label='wrt all pairs', color='orange')
     
-    if wrt_all_pairs:
-        _ = plotFpairs(ax[2], r_p, np_selected_bins/np_all_bins, np_selected_bins_err, label='wrt all pairs', color='orange')
-    _ = plotFpairs(ax[2], r_p, np_selected_bins/np_control_bins, np_selected_bins_err, label='wrt Control', color='b')
     setLabel(ax[2], r'Separation, $r$ [kpc]', r'Fraction of pairs, $f_{\rm halo\ pairs}}$ ', '', 'default', 'default', legend=False)
 
-    return np_selected_bins/np_control_bins
+    return np_selected_bins/np_all_bins

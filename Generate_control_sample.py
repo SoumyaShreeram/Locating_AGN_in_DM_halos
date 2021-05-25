@@ -48,7 +48,7 @@ r_p, shell_volume = aimm.shellVolume()
 
 # time since merger array [Gyr]
 dt_m_arr = [0, 0.5, 1, 2, 3, 4]
-key = 'tmm_pairs'  # 'tmm_self_pairs', 'self_pairs', 'pairs'
+key = 'selection'  # 'tmm_self_pairs', 'self_pairs', 'pairs', 'selection'
 
 
 """
@@ -76,7 +76,7 @@ if key == 'tmm_pairs':
     pairs_selected = cswl.openPairsFiles(key = 'mm and dv and tmm')
     
     # generate control sample for every case of radii
-    for r in [10, 11, 12, 13, 14, 15]:
+    for r in range(len(r_p)):
         print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
         cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_selected, r=r, dt_m_bins=dt_m_bins, key=key)
 
@@ -114,5 +114,13 @@ if key == 'pairs':
     for r in [0, 1, 2, 3]:
         print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
         cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r, key=key)
+
+if key == 'selection':
+    pairs_all = cswl.openPairsFiles(key = 'all')
+    pairs_mm_all = cswl.openPairsFiles(key = 'selection')
+
+    for r in [24, 25]:
+        print('-- Control for MM pairs with r_p = %.3f Mpc --'%r_p[r])
+        cswl.getMZmatchedPairs(hd_z_halo, pairs_all, pairs_mm_all, r=r, key=key, redshift_limit=redshift_limit)
 
 

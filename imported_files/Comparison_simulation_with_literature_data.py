@@ -19,8 +19,16 @@ from astropy.coordinates import SkyCoord
 from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 import numpy as np
-import Agn_incidence_from_Major_Mergers as aimm
 from scipy.stats import gaussian_kde
+
+# plotting imports
+import matplotlib
+import matplotlib.pyplot as plt
+
+# personal imports
+import Agn_incidence_from_Major_Mergers as aimm
+import plotting_cswl05 as pt
+
 
 def countSelectedPairs(all_selected_idx, print_msg = True, string = 'Major merger cut: '):
     """
@@ -109,16 +117,21 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
     for i in range(len(r_p)):
         if key == 'mm':
             filename = 'Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(r_p[i], mass_max)
+            
         if key == 'mm and dv':
             filename = 'Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(r_p[i], mass_max, dz_cut)
+            
         if key == 'dv':
             filename = 'dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(r_p[i], dz_cut)
+            
         if key == 'all':
             filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
+            
         if key == 'tmm':   
             filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
+            
         if key == 'selection':
-            filename = 'Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(r_p[i], mass_max, dz_cut)
+            filename = 'Major_dv_pairs/Selection_applied/Xoff_%.2f-%.2f_Tmm_%.1f-%.1fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], param_bins[2], param_bins[3], r_p[i], mass_max, dz_cut)
             
         if key == 'xoff':   
             filename = 'Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
@@ -197,12 +210,6 @@ def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
     count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
     return all_t_mm_idx, count_t_mm
 
-def decideBins(a, a_max):
-    "Function to decide the upper and lower limits of the bins"
-    diff_a = [a[0:2], a[1:3], a[2:4], a[3:5], a[4:], [a[5], a_max]]
-    
-    return diff_a
-
 
 def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshift_limit = 2, string_param = 't_mm'):
     """
@@ -211,7 +218,6 @@ def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshif
     """
     # object arr to save major pairs for every DM halo
     all_t_mm_idx = []
-    
     
     for i, p in enumerate(pairs_idx): 
         # list to save indicies of pairs classified as major mergers
@@ -225,7 +231,7 @@ def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshif
                     diff_time_pair = diff_t_mm_arr[p_idx]
                     
                     # only consider pairs that pass this time since merger-scale criterion
-                    if (param[0] <= diff_time_pair <= param[1]) or  ( param[0] <= diff_time <= param[1]):
+                    if (param[0] <= diff_time_pair < param[1]) or  ( param[0] <= diff_time < param[1]):
                         t_mm_idx.append(p_idx)
                     
         # save this info for the given halo in the object array
@@ -347,7 +353,10 @@ def decideWhereToSaveControlPairs(count_mz_matched_pairs, r, key = 'pairs', reds
     "Function decides where to save the control pairs"
     if key == 'pairs':
         np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
-        
+    
+    if key == 'selection':
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+    
     if key == 'self_pairs':
         np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
         
@@ -386,10 +395,10 @@ def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_m
         
         # count all halo pairs in the same mass and z bin as this pair
         for i in pairs_all_arr:
-            if pairs != i:
-                mass_condition = (m_ratio - mr_min <= massRatios(i, m_arr) <= m_ratio + mr_max)
-                z_condition = (mean_z - step_z) < meanZ(i, z_arr) < (mean_z + step_z)
-                param_condition =  (mean_param - step_param) < meanZ(i, param_arr) < (mean_param + step_param)
+            if pairs[0] != i[0] and pairs[1] != i[1]:
+                mass_condition = (m_ratio == massRatios(i, m_arr))
+                z_condition = (mean_z == meanZ(i, z_arr) )
+                param_condition =  (mean_param == meanZ(i, param_arr) )
 
                 # count pairs that pass the conditions
                 if mass_condition and z_condition and param_condition:
@@ -412,7 +421,7 @@ def decideBools(keyword = 'all'):
         major_mergers_only, delta_v_cut = False, True
     if keyword == 'mm':
         major_mergers_only, delta_v_cut = True, False
-    if keyword == 'mm and dv':
+    if keyword == 'mm and dv' or keyword == 'selection':
         major_mergers_only, delta_v_cut = True, True
     if keyword == 'all':
         major_mergers_only, delta_v_cut = False, False
@@ -546,5 +555,20 @@ def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max
     if keyword == 'selection':
         np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
         print('\n --- Saved mm and dv selected files --- ')
-
     return
+
+def getPlotModel(pairs_all, hd_z_halo, diff_t_mm_arr, vol, xoff_min=0.17, xoff_max=0.54, tmm_min=0.6, tmm_max=1.2, redshift_limit=2):
+    """
+    Function generates plots and saves the model for number of halos as a function of separations
+    """
+    total_conditions = selectionHalos(hd_z_halo, diff_t_mm_arr, xoff_min=xoff_min, xoff_max=xoff_max, tmm_min=tmm_min, tmm_max=tmm_max)
+    hd_agn_halo = hd_z_halo[total_conditions]
+    print("AGNs: %d"%(len(hd_agn_halo)) )
+
+    pairs_selected = openPairsFiles(key = 'selection', param_bins = [xoff_min, xoff_max, tmm_min, tmm_max])
+
+    fig, ax = plt.subplots(3,1,figsize=(5,14))
+    model = pt.plotModelResults(ax, hd_z_halo, pairs_all, pairs_selected, vol)
+
+    np.save('Data/pairs_z%.1f/prediction_xoff%.2f-%.2f_tmm%.1f-%.1fGyr.npy'%(redshift_limit, xoff_min, xoff_max, tmm_min, tmm_max), np.array(model), allow_pickle=True)
+    return 

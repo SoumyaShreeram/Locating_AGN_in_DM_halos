@@ -82,7 +82,7 @@ def norm(n):
         out = 1
     return out
 
-def shellVolume(r_p_min=1e-2, r_p_max=1.5e-1, num_bins=15):
+def shellVolume(r_p_min=1e-3, r_p_max=1.5e-1, num_bins=25):
     """
     Function to create projected radius array and to get the shell volume at every increment
     """

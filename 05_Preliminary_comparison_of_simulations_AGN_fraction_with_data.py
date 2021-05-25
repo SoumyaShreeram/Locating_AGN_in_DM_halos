@@ -62,11 +62,8 @@ h = 0.6777
 # get shell volume and projected radius bins [Mpc]
 r_p, shell_volume = aimm.shellVolume()
 
-# time since merger [Gyr]
-time_since_merger = 5
-
-# time since merger array [Gyr]
-dt_m_arr = [0, 0.5, 1, 2, 3, 4]
+dt_m_arr = np.load('Data/pairs_z%.1f/t_mm_deciles.npy'%redshift_limit, allow_pickle=True)
+dt_m_bins_arr = [[dt_m_arr[i], dt_m_arr[i+1]] for i in np.arange(len(dt_m_arr)-1)]
 
 # max mass ratio to classify as a major merger [dimensionless]
 mass_max = 3
@@ -76,13 +73,22 @@ dz_cut =  0.001
 
 # BOOLEAN: if the pairs have already been computed before
 run_find_pairs = True
+
 run_merger_pairs = False
+save_merger_indicies = False
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
 # look at decideBools(..) function is cswl for more details)
 keyword = 'mm and dv'
 major_mergers_only, delta_v_cut = cswl.decideBools(keyword = keyword)
 
+apply_selection = True
+if apply_selection:
+    new_key = 'selection'
+    xoff_min, xoff_max= 0.17, 0.54
+    tmm_min, tmm_max=0.0, 0.6
+else:
+    new_key = keyword
 """
 3. Open files and get relevant data
 """
@@ -94,18 +100,19 @@ hd_halo_z = hd_halo[conditions_halo]
 print("Halos: %d"%(len(hd_halo_z) ))
 
 
-# after tmm and xoff conditions
-diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
-total_conditions = cswl.selectionHalos(hd_halo_z, diff_t_mm_arr, xoff_min=0.1, xoff_max=0.2)
-hd_halo_z = hd_halo_z[total_conditions]
-print("AGNs: %d"%(len(hd_halo_z)) )
+if apply_selection:
+    # after tmm and xoff conditions
+    diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+    total_conditions = cswl.selectionHalos(hd_halo_z, diff_t_mm_arr, xoff_min=xoff_min, xoff_max=xoff_max, tmm_min=tmm_min, tmm_max=tmm_max)
+    hd_halo_z = hd_halo_z[total_conditions]
+    print("AGNs: %d"%(len(hd_halo_z)) )
 
 
 """
 3. Finding halo pairs
 """
 if run_find_pairs:
-    for r in np.arange(16):
+    for r in range(len(r_p)):
         print('\n ---- pairs within radius %.3f Mpc ---'%r_p[r])
         pos_spherical = aimm.getSphericalCoord(hd_halo_z)
 
@@ -117,7 +124,7 @@ if run_find_pairs:
         count_pairs = cswl.countSelectedPairs(all_idx, string = 'All pairs: ') 
            
         if delta_v_cut:            
-            # (1) choose only pairs that satisfy the delta v criteria
+            # (1) choose  pairs that satisfy the delta v criteria
             all_dv_idx, count_dv_major_pairs = cswl.deltaVelSelection(hd_halo_z, all_idx, dz_cut=dz_cut)
         
         if major_mergers_only and delta_v_cut:
@@ -129,7 +136,7 @@ if run_find_pairs:
             all_mm_idx, count_major_pairs = cswl.majorMergerSelection(hd_halo_z, all_idx, keyword=keyword)
             
         # save file based on the criteria applied     
-        cswl.saveSeparationIndicies(all_idx, r_p[r], keyword='selection')
+        cswl.saveSeparationIndicies(all_mm_dv_idx, r_p[r], keyword=new_key, redshift_limit=redshift_limit)
             
 """
 4. Studying the effect of Δ𝑡_merger on MM pairs
@@ -145,9 +152,8 @@ if run_merger_pairs:
     pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, key = keyword, dz_cut= dz_cut)
     
     diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
-    dt_m_bins_arr = cswl.decideBins(dt_m_arr, np.max(diff_t_mm_arr))
     
-    for i, dt_m in enumerate(dt_m_arr):
+    for i, dt_m in enumerate(dt_m_bins_arr):
         count_t_mm_arr = []
         dt_m_bins =  dt_m_bins_arr[i]
         
@@ -159,7 +165,9 @@ if run_merger_pairs:
             all_t_mm_idx, count_t_mm = cswl.selectParameterPairs(hd_halo_z, pairs_all[0][r], cosmo, diff_t_mm_arr, param = dt_m_bins, redshift_limit = redshift_limit)
             count_t_mm_arr.append(count_t_mm)
         
-            if keyword == 'mm and dv':
+            if save_merger_indicies and keyword == 'mm and dv':
                 np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1], r_p[r], mass_max, dz_cut), all_t_mm_idx, allow_pickle=True)
                 print('\n --- Saved mm and dv file --- ')
-        #cswl.saveTmmFiles(keyword, dt_m_bins, arr = count_t_mm_arr, redshift_limit = redshift_limit)
+        
+        # saves the counts (of halo pairs for a given bin, for all radius)
+        cswl.saveTmmFiles(keyword, dt_m_bins, arr = count_t_mm_arr, redshift_limit = redshift_limit)
