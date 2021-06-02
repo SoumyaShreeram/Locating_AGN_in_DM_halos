@@ -1,2 +1,2 @@
-# Locating_AGN_in_DM_halos
-This project studies the morphology on AGN in the cosmic web of Dark Matter
+# Tracing merger triggeered AGN in DM halos
+This project aims to modify the demographics of the AGN mock catalogue built using DM only simulations. The merger-triggered AGN that are found in excess in close pairs are accounted for in this study. 
