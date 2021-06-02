@@ -33,10 +33,11 @@ import Comparison_simulation_with_literature_data as cswl
 1. Defining input parameters
 """
 # look back into redshifts until...
-redshift_limit = 0.2
+redshift_limit = 2
 
 # pixel number from the simulation file
-pixel_no = '000000'
+number = np.arange(700, 768)
+pixel_no_arr = ['000'+ str(n) for n in number]
 
 # Define cosmology used in the notebook
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
@@ -46,23 +47,19 @@ h = 0.6777
 """
 2. Open files and get relevant data
 """
-_, hd_halo, _ = edh.getHeaders(pixel_no, np.array(['halo']))
+for pixel_no in pixel_no_arr:
+    print('\nComputing tmm for pixel no: %s (out of %s)'%(pixel_no, pixel_no_arr[-1]) )
+    _, hd_halo, _ = edh.getHeaders(pixel_no, np.array(['halo']))
 
-# Extracting positions and redshifts of the halos
-pos_z_halo, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
+    # Extracting positions and redshifts of the halos
+    _, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
 
-hd_z_halo = hd_halo[conditions_halo]
-print("Halos: %d"%(len(hd_z_halo) ))
+    hd_z_halo = hd_halo[conditions_halo]
+    print("Halos: %d"%(len(hd_z_halo) ))
 
-"""
-3. Computing Δ𝑡_𝑀𝑀 for a given redshift limit
-"""
-diff_t_mm_arr = []
-
-for i in range(len(hd_z_halo)):
-    print('-- ', i, ' --')
-    diff_t_mm = cswl.calTmm(cosmo, hd_z_halo[i]['HALO_scale_of_last_MM'], hd_z_halo[i]['redshift_R'])
-        
-    diff_t_mm_arr.append(diff_t_mm.value)
+    """
+    3. Computing Δ𝑡_𝑀𝑀 for a given redshift limit
+    """
     
-np.save('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), diff_t_mm_arr, allow_pickle=True)
+    
+    np.save('Data/pairs_z%.1f/t_mm/pixel_%s.npy'%(redshift_limit, pixel_no), diff_time.value, allow_pickle=True)

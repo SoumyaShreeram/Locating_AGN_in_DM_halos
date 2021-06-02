@@ -50,7 +50,8 @@ import plotting_cswl05 as pt
 redshift_limit = 2
 
 # pixel number from the simulation file
-pixel_no = '000000'
+number = np.arange(131, 140)
+pixel_no_arr = ['000'+ str(n) for n in number]
 
 # Define cosmology used in the notebook
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
@@ -78,66 +79,95 @@ run_merger_pairs = False
 save_merger_indicies = False
 
 # keywords can be: 'mm and dv', 'dv' or 'all' 
-# look at decideBools(..) function is cswl for more details)
 keyword = 'mm and dv'
 major_mergers_only, delta_v_cut = cswl.decideBools(keyword = keyword)
 
-apply_selection = True
+# if you wish to apply tmm and xoff selection cuts
+apply_selection = False
 if apply_selection:
     new_key = 'selection'
     xoff_min, xoff_max= 0.17, 0.54
-    tmm_min, tmm_max=0.0, 0.6
+    tmm_min, tmm_max= 0.6, 1.2
 else:
     new_key = keyword
+    
+# do you want to store the indicies or just the counts?
+save_indicies, save_counts = True, True
 """
 3. Open files and get relevant data
 """
-_, hd_halo, _ = edh.getHeaders(pixel_no, np.array([ 'halo']))
+count_pairs_arr2D = np.zeros((0, len(r_p)))
 
-# Extracting positions and redshifts of the halos
-_, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
-hd_halo_z = hd_halo[conditions_halo]
-print("Halos: %d"%(len(hd_halo_z) ))
+# iterate over the pixels of the simulation
+for pixel_no in pixel_no_arr:
+    all_mm_dv_idx_all = []
+    count_pairs_arr = []
 
+    # open halo file
+    _, hd_halo, _ = edh.getHeaders(pixel_no, np.array([ 'halo']))
 
-if apply_selection:
-    # after tmm and xoff conditions
-    diff_t_mm_arr = np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
-    total_conditions = cswl.selectionHalos(hd_halo_z, diff_t_mm_arr, xoff_min=xoff_min, xoff_max=xoff_max, tmm_min=tmm_min, tmm_max=tmm_max)
-    hd_halo_z = hd_halo_z[total_conditions]
-    print("AGNs: %d"%(len(hd_halo_z)) )
+    # extracting the conditions for choosing halos
+    _, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
+    hd_halo_z = hd_halo[conditions_halo]
+    print("Halos: %d"%(len(hd_halo_z) ))
 
-
-"""
-3. Finding halo pairs
-"""
-if run_find_pairs:
-    for r in range(len(r_p)):
-        print('\n ---- pairs within radius %.3f Mpc ---'%r_p[r])
-        pos_spherical = aimm.getSphericalCoord(hd_halo_z)
-
-        # create tree
-        tree_data = cKDTree(np.transpose(np.abs(pos_spherical)), leafsize=1000.0)
-
-        # list of lists of all pair indicies per DM halo
-        all_idx = tree_data.query_ball_tree(tree_data, r=r_p[r], p=2) 
-        count_pairs = cswl.countSelectedPairs(all_idx, string = 'All pairs: ') 
-           
-        if delta_v_cut:            
-            # (1) choose  pairs that satisfy the delta v criteria
-            all_dv_idx, count_dv_major_pairs = cswl.deltaVelSelection(hd_halo_z, all_idx, dz_cut=dz_cut)
+    if apply_selection:
+        # after tmm and xoff conditions
+        diff_t_mm_arr = np.load('Data/pairs_z%.1f/t_mm/pixel_%s.npy'%(redshift_limit, pixel_no), allow_pickle=True)
+        diff_t_mm_arr = np.abs(diff_t_mm_arr)
         
-        if major_mergers_only and delta_v_cut:
-            # (2) choose major pairs (major mergers) with the delta v criteria
-            all_mm_dv_idx, count_major_pairs = cswl.majorMergerSelection(hd_halo_z, all_dv_idx)
+        # applying the cuts
+        total_conditions = cswl.selectionHalos(hd_halo_z, diff_t_mm_arr, xoff_min=xoff_min, xoff_max=xoff_max, tmm_min=tmm_min, tmm_max=tmm_max)
+        hd_halo_z = hd_halo_z[total_conditions]
+        print("AGNs: %d"%(len(hd_halo_z)) )
+
+
+    """
+    3. Finding halo pairs
+    """
+    if run_find_pairs:
+        for r in range(len(r_p)):
+            print('\n ---- pairs within radius %.3f Mpc ---'%r_p[r])
+            pos_spherical = aimm.getSphericalCoord(hd_halo_z)
+
+            # create tree
+            tree_data = cKDTree(np.transpose(np.abs(pos_spherical)), leafsize=1000.0)
+
+            # list of lists of all pair indicies per DM halo
+            all_idx = tree_data.query_ball_tree(tree_data, r=r_p[r], p=2) 
+            count_pairs = cswl.countSelectedPairs(all_idx, string = 'All pairs: ') 
+
+            if delta_v_cut:            
+                # (1) choose  pairs that satisfy the delta v criteria
+                all_dv_idx, count_pairs = cswl.deltaVelSelection(hd_halo_z, all_idx, dz_cut=dz_cut)
+
+            if major_mergers_only and delta_v_cut:
+                # (2) choose major pairs (major mergers) with the delta v criteria
+                all_mm_dv_idx, count_pairs = cswl.majorMergerSelection(hd_halo_z, all_dv_idx)
+
+            if major_mergers_only and not delta_v_cut:
+                # (3) choose only major pairs (major mergers)
+                all_mm_idx, count_pairs = cswl.majorMergerSelection(hd_halo_z, all_idx, keyword=keyword)
+            
+            if save_indicies:
+                # save file based on the criteria applied
+                pairs_selected = cswl.tuplePairArr(np.array(all_mm_dv_idx))
+                all_mm_dv_idx_all.append(pairs_selected)           
+            
+            if save_counts:
+                count_pairs_arr.append(count_pairs)
         
-        if major_mergers_only and not delta_v_cut:
-            # (3) choose only major pairs (major mergers)
-            all_mm_idx, count_major_pairs = cswl.majorMergerSelection(hd_halo_z, all_idx, keyword=keyword)
-            
-        # save file based on the criteria applied     
-        cswl.saveSeparationIndicies(all_mm_dv_idx, r_p[r], keyword=new_key, redshift_limit=redshift_limit)
-            
+        # decides wether to save the counts of pairs or/and the indicies
+        if save_indicies:
+            cswl.saveSeparationIndicies(all_mm_dv_idx_all, r_p[r], keyword=new_key, redshift_limit=redshift_limit, pixel_no=pixel_no)
+    
+    
+        if save_counts:
+            count_pairs_arr2D = np.append(count_pairs_arr2D, [count_pairs_arr], axis=0)
+
+    
+np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/num_pairs_pixels_%s-%s.npy'%(redshift_limit, pixel_no_arr[0], pixel_no_arr[-1]), count_pairs_arr2D, allow_pickle=True)
+
 """
 4. Studying the effect of Δ𝑡_merger on MM pairs
 
