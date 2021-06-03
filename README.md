@@ -1,2 +1,4 @@
 # Tracing merger triggered AGN in DM halos
 This project aims to modify the demographics of the AGN mock catalogue built using DM only simulations. The merger-triggered AGN that are found in excess in close pairs are accounted for in this study. 
+
+The `0x.__.ipynb` notebooks demonstrate the proof of concept and the outputs are complied into the python `00x.__.py` scrits for running over the all-sky simulation. The functions/methods used in all the scripts and notebooks are present in the `/imported_files` directory. Each imported `__.py` file has an assembly of functions that serve a common theme. 
