@@ -133,18 +133,18 @@ def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_dv_all, pairs_selected_
     """
     flare = sns.color_palette("pastel", 5).as_hex()
     mec = ['k', '#05ad2c', '#db5807', '#a30a26', 'b']
-    fig, ax = plt.subplots(1,1,figsize=(7,6))
+    fig, ax = plt.subplots(1,1,figsize=(5,4))
 
     # plotting the 4 cases with the 4 different cuts
-    ax, n_pairs, n_pairs_err = plotNpSep(ax, hd_z_halo, pairs_all[1], 'k', 'All pairs', mec[0]) 
+    ax, n_pairs, n_pairs_err = plotNpSep(ax, hd_z_halo, pairs_all[1], 'k', r' $\mathbf{\Gamma}_{m;\  \Delta v;\ t_{\rm MM};\  \tilde{X}_{\rm off}}(r)\ $', mec[0]) 
     #ax, n_mm_pairs, n_pairs_mm_err = plotNpSep(ax, hd_z_halo, pairs_mm_all[1], flare[1], r'Mass ratio 3:1', mec[2])
-    ax, n_mm_dv_pairs, n_pairs_mm_dv_err = plotNpSep(ax, hd_z_halo, pairs_mm_dv_all[1], flare[3], r'Mass ratio 3:1, $\Delta z_{R\ and\ S }  < 10^{-3} $', mec[3])
-    ax, n_selected_pairs, n_selected_err = plotNpSep(ax, hd_z_halo, pairs_selected_all[1], flare[2], r'Mass ratio 3:1, $\Delta z_{R\ and\ S} < 10^{-3}$,'+'\n'+r' $t_{\rm MM} \in [1-3]$ Gyr, $\tilde{X}_{\rm off} \in [0.1, 0.2]$', mec[1])
+    ax, n_mm_dv_pairs, n_pairs_mm_dv_err = plotNpSep(ax, hd_z_halo, pairs_mm_dv_all[1], flare[3], r'$\mathbf{\Gamma}_{t_{\rm MM};\  \tilde{X}_{\rm off}}(r|\ m;\  \Delta v)$', mec[3])
+    ax, n_selected_pairs, n_selected_err = plotNpSep(ax, hd_z_halo, pairs_selected_all[1], flare[2], r'$\mathbf{\Gamma}(r|\ m;\  \Delta v;\ t_{\rm MM};\  \tilde{X}_{\rm off} )$'+'\n'+r'$t_{\rm MM} \in [0.6-1.2]$ Gyr, $\tilde{X}_{\rm off} \in [0.17, 0.54]$', mec[1])
     #ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  r'$M^*, z$ control sample', mec[3])
 
     ax.set_yscale("log")
-    setLabel(ax, r'Separation, $r$ [kpc]', r'$n_{\rm halo\ pairs}}$ [Mpc$^{-3}$]', '', 'default', 'default', legend=False)
-    ax.legend(bbox_to_anchor=(1.05, 1),  loc='upper left', fontsize=14, frameon=False)
+    setLabel(ax, r'Separation, $r$ [kpc]', r'$\mathbf{\Gamma}(r)$ [Mpc$^{-3}$]', '', 'default', 'default', legend=False)
+    ax.legend(bbox_to_anchor=(1.05, 1),  loc='upper left', fontsize=15, frameon=False)
     
     pairs_arr = np.array([n_pairs, n_mm_dv_pairs, n_selected_pairs], dtype=object)
     pairs_arr_err = np.array([n_pairs_err, n_pairs_mm_dv_err, n_selected_err], dtype=object)
@@ -282,7 +282,7 @@ def plotGaussianKde(param_arr, Z, string, i, j, set_xy_lim=True):
 
 def plotModelResults(ax, hd_halo, pairs_all, pairs_selected, vol):
     """
-    Plots the models generated for bins of tmm and xmm
+    Plots the models generated for bins of Tmm and Xoff
     """
     # get shell volume and projected radius bins [Mpc]
     r_p, shell_volume = aimm.shellVolume()

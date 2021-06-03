@@ -20,6 +20,7 @@ from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 import numpy as np
 from scipy.stats import gaussian_kde
+import os
 
 # plotting imports
 import matplotlib
@@ -99,14 +100,8 @@ def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3, keyw
     count_major_mergers = countSelectedPairs(all_mm_idx, string = 'Major merger %d : 1 cut '%mass_max)
     return all_mm_idx, count_major_mergers
 
-def indexArray(all_mm_idx):
-    idx_arr = []
-    for i in range(len(all_mm_idx)):
-        if len(all_mm_idx[i]) != 0:
-            idx_arr.append(i)
-    return idx_arr
 
-def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, param_bins = [0.5, 1]):
+def openPairsFiles(key = 'mm and dv', data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, pixel_no='000000'):
     """
     Function to open all the files with 
     """
@@ -114,132 +109,95 @@ def openPairsFiles(key, data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_
     r_p, shell_volume = aimm.shellVolume()
     pairs_idx_all, n_pairs_arr = [], []
     
-    for i in range(len(r_p)):
-        if key == 'mm':
-            filename = 'Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(r_p[i], mass_max)
-            
-        if key == 'mm and dv':
-            filename = 'Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(r_p[i], mass_max, dz_cut)
-            
-        if key == 'dv':
-            filename = 'dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(r_p[i], dz_cut)
-            
-        if key == 'all':
-            filename = 'pairs_idx_r%.3f.npy'%(r_p[i])
-            
-        if key == 'tmm':   
-            filename = 'Major_dv_pairs/Tmm_%.2f-%.2fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
-            
-        if key == 'selection':
-            filename = 'Major_dv_pairs/Selection_applied/Xoff_%.2f-%.2f_Tmm_%.1f-%.1fGyr/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], param_bins[2], param_bins[3], r_p[i], mass_max, dz_cut)
-            
-        if key == 'xoff':   
-            filename = 'Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(param_bins[0], param_bins[1], r_p[i], mass_max, dz_cut)
-            
-        pairs_idx = np.load(data_dir+filename, allow_pickle=True)
-        n_pairs = countSelectedPairs(pairs_idx, print_msg = False)
-        
-        n_pairs_arr.append(n_pairs)
-        pairs_idx_all.append(pairs_idx)        
-    return np.array([pairs_idx_all, n_pairs_arr], dtype=object)
-
-def saveTmmFiles(key, dt, arr , redshift_limit = 2, param='t_mm'):
-    """
-    Function decides where to save the tmm evaluated files
-    """
     if key == 'mm and dv':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
+        filename = 'Major_dv_pairs/p_id_pixel%s_mm%d_dz%.3f.npy'%(pixel_no, mass_max, dz_cut)
+
+    pairs_idx = np.load(data_dir+filename, allow_pickle=True)
+    return pairs_idx
+
+def getSnapshotZ(hd_z_halo):
+    """
+    Function gets the z and a value at the snapshot of the UNIT simulation for all the input halos
+    """
+    # load the file that has the information about the snapshots
+    fname = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS', 'fixedAmp_InvPhase_001', 'snapshot_redshift_list.txt')
+    shell_redshifts = np.loadtxt(fname)
     
-    if key == 'mm':
-        np.save('Data/pairs_z%.1f/Major_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
-        
-    if key == 'dv':
-        np.save('Data/pairs_z%.1f/dv_pairs/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param,  dt[0], dt[1]), arr, allow_pickle=True)
+    # reads of the shell z and a from the file
+    shell_z = [i[1] for i in shell_redshifts]
+    shell_a = [i[2] for i in shell_redshifts]
+    
+    # reframe the array as a tuple array with upper and lower limits of the shell
+    shell_z_edges = np.array([[shell_z[i+1], shell_z[i]] for i in range(len(shell_z)-1)])
+    shell_z_edges = np.transpose(shell_z_edges)
+    
+    shell_a_edges = np.array([[shell_a[i+1], shell_a[i]] for i in range(len(shell_a)-1)])
+    shell_a_edges = np.transpose(shell_a_edges)
+    
+    # scale of last mm for all the input halos
+    a = hd_z_halo['HALO_scale_of_last_MM']
+    
+    # convert the halo redshifts into snapshot redshifts
+    zsnap_halo, asnap_halo = [], []
+    for i, z in enumerate(hd_z_halo['redshift_R']):
+        # get the upper shell edge
+        zsnap_halo.append(shell_z_edges[0][(shell_z_edges[0] <= z) & (z <= shell_z_edges[1])][0])
+        asnap_halo.append(shell_a_edges[1][(shell_a_edges[0] >= a[i]) & (a[i] >= shell_a_edges[1])][0])
+    return zsnap_halo, asnap_halo
 
-    # if you want to save all the pairs
-    if key == 'all':
-        np.save('Data/pairs_z%.1f/all_pairs_%s%.2f-%.2f.npy'%(redshift_limit, param, dt[0], dt[1]), arr, allow_pickle=True)
-    return
-
-
-def tmmToScale(cosmo, dt_m_arr):
-    "Function to convert time time since MM array to scale factor of last MM"
-    scale_mm = []
-    for t in dt_m_arr:
-        # converting the time since merger into scale factor
-        merger_z = z_at_value(cosmo.lookback_time, t*u.Gyr)
-        merger_scale = 1/(1 + merger_z)
-        scale_mm.append(merger_scale)
-    return scale_mm
-
-def calTmm(cosmo, a, z):
+def calTmm(cosmo, asnap_halo, zsnap_halo):
+    """
+    Function calculates the time since last major merger, mm, for the halos given the halo z and scale, a, of last mm
+    """
     # convert the merger scale factor into redshift
-    merger_z = z_at_value(cosmo.scale_factor, a)
-    
+    merger_z = (1/np.array([asnap_halo]))-1
+
     # convert the merger & current redshifts into lookback time
     merger_time = cosmo.lookback_time(merger_z)
-    current_time = cosmo.lookback_time(z)
-    
+    current_time = cosmo.lookback_time(zsnap_halo)
+
     # difference in lookback time between the merger and AGN redshift
     diff_time = merger_time-current_time
     return diff_time
 
-def defineTimeSinceMergeCut(hd_obj, pairs_idx, cosmo, time_since_merger = 1):
-    """
-    Define the time since merger cut 
-    """
-    # object arr to save major pairs for every DM halo
-    all_t_mm_idx = []
-    
-    for i, p in enumerate(pairs_idx): 
-        # list to save indicies of pairs classified as major mergers
-        t_mm_idx = []
-        diff_time = calTmm(cosmo, hd_obj[i]['HALO_scale_of_last_MM'], hd_obj[i]['redshift_R'])
-        
-        # if there are more than 'self'-pairs
-        if len(p) >= 1:
-            for p_idx in p:                
-                diff_time_pair = calTmm(cosmo, hd_obj[p_idx]['HALO_scale_of_last_MM'], hd_obj[p_idx]['redshift_R'])
-                # only consider pairs that pass this time since merger-scale criterion
-                if (diff_time_pair <= time_since_merger*u.Gyr) or  (diff_time <= time_since_merger*u.Gyr):
-                    t_mm_idx.append(p_idx)
-                    
-        # save this info for the given halo in the object array
-        all_t_mm_idx.append(t_mm_idx)
-    
-    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = 'T_mm = %d Gyr: '%time_since_merger)
-    return all_t_mm_idx, count_t_mm
-
-
-def selectParameterPairs(hd_obj, pairs_idx, cosmo, diff_t_mm_arr, param, redshift_limit = 2, string_param = 't_mm'):
+def selectParameterPairs(pairs_idx, r, halo_param_arr, param):
     """
     Select pairs that pass the parameter cuts
+    @pairs_idx :: arr of tuples with the chosen pairs < r 
+    @r :: index of the radius bin
+    @param_arr_all_halos :: arr with values of the parameter of concern 
     @param :: list with [lower_limit, upper_limit] of the parameter bin
     """
-    # object arr to save major pairs for every DM halo
-    all_t_mm_idx = []
+    count_pairs = 0
     
-    for i, p in enumerate(pairs_idx): 
-        # list to save indicies of pairs classified as major mergers
-        t_mm_idx = []
-        diff_time = diff_t_mm_arr[i]
+    if r == 0:        
+        pairs_selected = pairs_idx[r]
         
-        # if there are more than 'self'-pairs
-        if len(p) >= 1:
-            for p_idx in p:
-                if i != p_idx:
-                    diff_time_pair = diff_t_mm_arr[p_idx]
-                    
-                    # only consider pairs that pass this time since merger-scale criterion
-                    if (param[0] <= diff_time_pair < param[1]) or  ( param[0] <= diff_time < param[1]):
-                        t_mm_idx.append(p_idx)
-                    
-        # save this info for the given halo in the object array
-        all_t_mm_idx.append(t_mm_idx)
+    if r > 0:
+        pairs_this_bin = pairs_idx[r]
+        pairs_previous_bin = pairs_idx[r-1]
         
-    count_t_mm = countSelectedPairs(all_t_mm_idx, print_msg = False, string = '%s = %.1f - %.1f Gyr: '%(string_param, param[0], param[1]))
-    return all_t_mm_idx, count_t_mm
+        # get rid of the pairs that were counted in the previous radius bin
+        pairs_selected = [current_pair for current_pair in pairs_this_bin if current_pair not in pairs_previous_bin]
+        pairs_selected = np.array(pairs_selected)
+    
+    # process the pairs in the given radius bin, which passed all the mm and dv criteria 
+    for i, p in enumerate(pairs_selected): 
+        # get the  param values of the pair 
+        param_p1, param_p2 = halo_param_arr[int(p[0])],  halo_param_arr[int(p[1])]
+        
+        if (param[0] <= param_p1 < param[1]) or  ( param[0] <= param_p2 < param[1]):
+            count_pairs += 1
+    return count_pairs
 
+
+def generateDeciles(diff_t_mm_arr, tile = 10):
+    "Function generates the deciles for the parameter arr"
+    deciles = [int(i*((len(diff_t_mm_arr)-1)/tile)) for i in np.arange(tile+1)]
+    dt_m_arr = np.sort(diff_t_mm_arr)[deciles]
+    
+    dt_m_bins_arr = [[dt_m_arr[i], dt_m_arr[i+1]] for i in np.arange(len(dt_m_arr)-1)]
+    return dt_m_bins_arr
 
 def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
     """
@@ -250,10 +208,6 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
     
     if key == 'mm and dv':
         data_dir = 'Data/pairs_z%.1f/Major_dv_pairs/'%redshift_limit
-    if key == 'dv':
-        data_dir = 'Data/pairs_z%.1f/dv_pairs/'%redshift_limit
-    if key == 'mm':
-        data_dir = 'Data/pairs_z%.1f/Major_pairs/'%redshift_limit
     if key == 'all':
         data_dir = 'Data/pairs_z%.1f/'%redshift_limit    
         
@@ -327,6 +281,23 @@ def getPairIndicies(pairs_idx, r):
     for j in range(pairs_idx[r].shape[0]):
         if len(pairs_idx[r][j]) >= 1:
             for p in pairs_idx[r][j]:
+                # don't want a pair with itself
+                if j != p: 
+                    two_idx = sorted([j, p])
+                    pairs_arr = np.append(pairs_arr, [two_idx], axis=0)
+        
+    pairs_arr = np.unique(pairs_arr, axis=0)
+    return pairs_arr
+
+def tuplePairArr(pairs_idx):
+    "Function generates an array that holds all the pair indicies"
+    pairs_arr = np.zeros((0, 2))
+    two_idx = []
+    
+    # get the indicies of the pair
+    for j in range(pairs_idx.shape[0]):
+        if len(pairs_idx[j]) >= 1:
+            for p in pairs_idx[j]:
                 # don't want a pair with itself
                 if j != p: 
                     two_idx = sorted([j, p])
@@ -531,7 +502,7 @@ def selectionHalos(hd_z_halo, diff_t_mm_arr,  xoff_min=0.2, xoff_max=0.3, tmm_mi
     total_conditions = xoff_condition & tmm_condition
     return total_conditions
 
-def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max=3, dz_cut=0.001):
+def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max=3, dz_cut=0.001, pixel_no='000000'):
     """
     Function to decide where to save the separation indicies
     """
@@ -540,7 +511,7 @@ def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max
             print('\n --- Saved mm and dv file --- ')
          
     if keyword == 'mm and dv':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
+        np.save('Data/pairs_z%.1f/Major_dv_pairs/p_id_pixel%s_mm%d_dz%.3f.npy'%(redshift_limit, pixel_no, mass_max, dz_cut), all_idx, allow_pickle=True)
         print('\n --- Saved mm and dv file --- ')
 
     if keyword == 'dv':

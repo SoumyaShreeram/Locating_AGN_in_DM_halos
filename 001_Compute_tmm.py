@@ -43,7 +43,6 @@ pixel_no_arr = ['000'+ str(n) for n in number]
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
 h = 0.6777
 
-
 """
 2. Open files and get relevant data
 """
@@ -60,6 +59,9 @@ for pixel_no in pixel_no_arr:
     """
     3. Computing Δ𝑡_𝑀𝑀 for a given redshift limit
     """
+    zsnap_halo, asnap_halo = cswl.getSnapshotZ(hd_z_halo)
+    tmm = cswl.calTmm(cosmo, asnap_halo, zsnap_halo)
     
+    tmm[tmm<0*u.Gyr] = 0
     
-    np.save('Data/pairs_z%.1f/t_mm/pixel_%s.npy'%(redshift_limit, pixel_no), diff_time.value, allow_pickle=True)
+    np.save('Data/pairs_z%.1f/t_mm/pixel_%s.npy'%(redshift_limit, pixel_no), tmm.value, allow_pickle=True)
