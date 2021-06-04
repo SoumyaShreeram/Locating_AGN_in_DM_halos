@@ -1,11 +1,12 @@
 """
-05. Preliminary comparison of the 𝑓𝑀𝑀 between simulation and data
+004. Select pairs for the chosen Xoff/Rvir deciles
 
-The notebook is similar to the notebook 02, which builds a major merger catalog. However, here things are done slightly differently: (1) halo pairs are generated, (2) the criteria are applied, rather than the other way around (as shown in notebook 02).
+Here the pairs are computed using the query ball tree cKDTree algorithm. The chosen pairs have mass ratio of 0.33<m1/m2<3 and redshift difference of < 0.001. This ensures that if the pairs underwent a merger, it must be a major merger. The script selects the pairs that further pass the criteria that at least one of the components of the pairs have an Xoff/Rvir value within the chosen decile.
 
 1. Loading data and defining input parameters
-2. Finding pairs and creating a major/minor sample
-2. Studying merger fraction 𝑓𝑀𝑀 as a function of redshift
+2. Parameters used for creating the Major Merger catalogue
+3. Open files and get relevant data
+4. Studying the effect of 𝑋̃_off on MM pairs
 
 Script written by: Soumya Shreeram
 Project supervised by: Johan Comparat
@@ -49,69 +50,66 @@ import plotting_cswl05 as pt
 # look back into redshifts until...
 redshift_limit = 2
 
-# pixel number from the simulation file
-pixel_no = '000000'
+# pixel numbers chosen for computation from the all-sky simulation file
+number = np.arange(0, 10)
+pixel_no_arr = ['00000'+ str(n) for n in number]
 
 # Define cosmology used in the notebook
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
 h = 0.6777
 
 """
-2. Parameters for creating the Major Merger catalogue
+2. Parameters used for creating the Major Merger catalogue
 """
 # get shell volume and projected radius bins [Mpc]
 r_p, shell_volume = aimm.shellVolume()
 
-# max mass ratio to classify as a major merger [dimensionless]
-mass_max = 3
+# keywords can be: 'mm and dv' or 'all' 
+keyword = 'mm and dv'
 
-# defining the redshift bin for a merger in terms of dv = c*z [km/s]
-dz_cut =  0.001
+# arr to save counts for every pixel, for every radius-bin
+count_pairs_all_r = np.zeros( (0, len(r_p) ) )
 
-# keywords can be: 'mm and dv', 'dv' or 'all' 
-# look at decideBools(..) function is cswl for more details)
-keyword = 'all'
+# decile index
+decile_idx = 3
+
 
 """
 3. Open files and get relevant data
 """
-_, hd_halo, _ = edh.getHeaders(pixel_no, np.array([ 'halo']))
+# iterate over the pixels of the simulation
+for pixel_no in pixel_no_arr:
+    _, hd_halo, _ = edh.getHeaders(pixel_no, np.array([ 'halo']))
 
-# Extracting positions and redshifts of the halos
-_, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
-hd_z_halo = hd_halo[conditions_halo]
-
-print("Halos: %d"%(len(hd_z_halo) ))
-
-xoff_all = hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir']
-xoff_min, xoff_max = np.min(xoff_all), np.max(xoff_all)
-xoff_arr = np.load('Data/pairs_z%.1f/xoff_deciles.npy'%redshift_limit, allow_pickle=True)
-
-"""
-4. Studying the effect of 𝑋̃_off on MM pairs
-
-Now that all the pairs for the chosen cases of time since major mergers are computed, we can proceed to calculate the fraction of halo pairs for each case.
-
-𝑓_halo_pairs = NP / N(N−1)×Shell volume
-
-where 𝑁𝑃 is the number of pairs and 𝑁 is the total number of objects from which pairs are chosen.
-"""
-pairs_all = cswl.openPairsFiles(data_dir='Data/pairs_z%.1f/'%redshift_limit, key = keyword, dz_cut= dz_cut)
+    # Extracting positions and redshifts of the halos
+    _, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
+    hd_z_halo = hd_halo[conditions_halo]
     
-# generate bins
-xoff_bins_arr = [[xoff_arr[i], xoff_arr[i+1]] for i in np.arange(len(xoff_arr)-1)]
+    xoff_all = hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir']
+    xoff_deciles = cswl.generateDeciles(xoff_all)
+    xoff_bins = xoff_deciles[decile_idx]
     
-for i, xoff in enumerate(xoff_arr[:-1]):
-    count_xoff_arr = []
+    print("Pixel: %s, Halos: %d, xoff decile: %.2f - %.2f"%( pixel_no, len(hd_z_halo), xoff_bins[0], xoff_bins[1] ))
 
-    for r in range(len(r_p)): 
-        print('\n ---- Merger pairs within radius %.1f Mpc, Xoff = %.2f - %.2f ---'%((1e3*r_p[r]), xoff_bins_arr[i][0], xoff_bins_arr[i][1]))
-
-        _, count_xoff = cswl.selectParameterPairs(hd_z_halo, pairs_all[0][r], cosmo, xoff_all, param = xoff_bins_arr[i], redshift_limit = redshift_limit, string_param = 'x_off')
-        count_xoff_arr.append(count_xoff)
+    """
+    3.1 Studying the effect of 𝑋̃_off on MM pairs
+    """
+    
+    # load the pair indicies
+    pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no)  
+    
+    # go over every radius bin to choose pairs within the decile bin
+    count_pairs_x_off_arr = []
+    for i, r in enumerate(r_p):        
         
-        #if keyword == 'mm and dv':
-         #       np.save('Data/pairs_z%.1f/Major_dv_pairs/Xoff_%.2f-%.2f/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, xoff_bins_arr[i][0], xoff_bins_arr[i][1], r_p[r], mass_max, dz_cut), all_xoff_idx, allow_pickle=True)
-         #       print('\n --- Saved mm and dv file --- ')
+        # select pairs
+        count_pairs_x_off = cswl.selectParameterPairs(pairs_idx, i, xoff_all, param=xoff_bins)
+        count_pairs_x_off_arr.append(count_pairs_x_off)
+        
+        print('\n---- radius %.2f Mpc: %d ---'%(r, count_pairs_x_off))
+
+    # save this for every pixel
+    count_pairs_all_r = np.append(count_pairs_all_r, [count_pairs_x_off_arr], axis=0)
     
-    cswl.saveTmmFiles(keyword, xoff_bins_arr[i], arr = count_xoff_arr, redshift_limit = redshift_limit, param='x_off')
+# saves the counts (for all chosen pixels and all radii)
+np.save('Data/pairs_z%.1f/Major_dv_pairs/num_pairs_pixel%s-%s_xoff_decile%d.npy'%(redshift_limit, pixel_no_arr[0], pixel_no_arr[-1], decile_idx)  , count_pairs_all_r, allow_pickle=True)

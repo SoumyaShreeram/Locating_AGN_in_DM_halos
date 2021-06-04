@@ -7,6 +7,7 @@ Script written by: Soumya Shreeram
 Project supervised by Johan Comparat 
 Date created: 30th March 2021
 """
+
 # scipy modules
 from scipy.spatial import cKDTree
 from scipy.interpolate import interp1d
@@ -250,6 +251,22 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     # fractional number density
     f_pairs = num_pairs/(N*shell_volume[:len(num_pairs)])
     return f_pairs, error(num_pairs)/(N*shell_volume[:len(num_pairs)])
+
+def Gamma(num_pairs, n):
+    """
+    Function to convert the number of pairs into a fractional number density per shell
+    @redshift_limit :: the initial redshift limit set on the sample (needed for opening dir)
+    """
+    # get shell volume and projected radius bins
+    r_p, shell_volume = aimm.shellVolume()
+    
+    # normalization
+    total_pairs = np.sum( n*(n - 1)/2 )
+    
+    # number density
+    Gamma = num_pairs/(total_pairs*shell_volume)
+    error_Gamma = error(num_pairs)/(total_pairs*shell_volume)
+    return Gamma, error_Gamma 
 
 def getAllMMscales(hd_obj, pairs_mm_all, r_p):
     "Function to get the scale of last MM of all the pairs for all radius"

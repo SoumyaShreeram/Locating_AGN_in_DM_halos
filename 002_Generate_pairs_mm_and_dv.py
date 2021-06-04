@@ -56,7 +56,7 @@ import plotting_cswl05 as pt
 redshift_limit = 2
 
 # pixel number from the simulation file
-number = np.arange(590, 600)
+number = np.arange(690, 700)
 pixel_no_arr = ['000'+ str(n) for n in number]
 
 # Define cosmology used in the notebook

@@ -87,7 +87,7 @@ def saveMMFiles(hd_mm_halo_all_px, hd_mm_agn_all_px, num_mass_mm, z, t):
 
 def getMMFilesAllSky(redshift_limit, time_since_merger, agn_FX_soft=0, num_pixels=25, save_files=True):
     """
-    Generate MM sample for all number of pixels set in the input, for all mass bins.
+    DEPRICATED: Generate MM sample for all number of pixels set in the input, for all mass bins.
     """
     # define cosmology 
     lcdm = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
@@ -124,7 +124,7 @@ def getMMFilesAllSky(redshift_limit, time_since_merger, agn_FX_soft=0, num_pixel
 
 def countPairsAllSky(z, t, plot=True):
     """
-    Function to count pairs for different z and t
+    DEPRICATED: Function to count pairs for different z and t
     """
     hd_mm_halo_all_px, hd_mm_agn_all_px, num_mass_mm = getMMFilesAllSky(redshift_limit=z, time_since_merger=t, save_files=False)
     
@@ -138,3 +138,41 @@ def countPairsAllSky(z, t, plot=True):
         pt.plotNumberDensityVsRadius(num_pairs_halo_all_px, num_mass_mm[0][0][1], pal_halo, r'DM Halos ($z< %.1f,\ \Delta t_{\rm m} = %d$ Gyr)'%(z, t), l_type=False, want_label=False)
         pt.plotNumberDensityVsRadius(num_pairs_agn_all_px, num_mass_mm[0][1][1], pal_agn, r'AGNs ($z< %.1f,\ \Delta t_{\rm m} = %d$ Gyr)'%(z, t), l_type=False, want_label=False) 
     return
+
+def genPixelArr(ll, ul):
+    """
+    Function to get the pixel array 
+    """
+    number = np.arange(ll, ul)
+    if ul <= 10:
+        pixel_no_arr = ['00000'+ str(n) for n in number]
+    elif ul <= 100 and ul > 10:
+        pixel_no_arr = ['0000'+ str(n) for n in number]
+    else:
+        pixel_no_arr = ['000'+ str(n) for n in number]
+    return pixel_no_arr
+
+def allPixelNames():
+    """
+    Function to give the names of all the pixels of the unit simulation
+    """
+    hundreds = np.concatenate([genPixelArr(ll=int(i*100), ul=int(i*100 + 100) ) for i in np.arange(1, 7) ], axis=None)
+    
+    pixel_no_big_arr = np.array([genPixelArr(ll=0, ul=10), genPixelArr(ll=10, ul=100), hundreds,  genPixelArr(ll=700, ul=768)], dtype=object)
+    pixel_no_big_arr_concat = np.concatenate(pixel_no_big_arr, axis=None)
+    return pixel_no_big_arr_concat, pixel_no_big_arr
+
+def getHaloLengths(redshift_limit=2):
+    halo_lengths = []
+    pixel_arr, _ = allPixelNames()
+    for px in pixel_arr[0:10]:
+        print(px)
+        _, hd_halo, _ = edh.getHeaders(px, np.array(['halo']))
+        # halos
+        _, _, conditions_halo = edh.getGalaxyData(hd_halo, '', redshift_limit)
+        
+        hd_z_halo = hd_halo[conditions_halo]
+        
+        halo_lengths.append( len(hd_z_halo) )
+    np.save('Data/all_sky_halo_lengths_z%.1f.npy'%redshift_limit, halo_lengths, allow_pickle=True)
+    return 

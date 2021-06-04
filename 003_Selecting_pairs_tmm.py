@@ -1,11 +1,11 @@
 """
 003. Select pairs for the chosen tmm deciles
 
-Here the pairs are computed using the query ball tree cKDTree algorithm. The chosen pairs have mass ratio of 0.33<m1/m2<3 and redshift difference of < 0.001. This ensures that if the pairs underwent a merger, it must be a major merger. The script is selects the pairs that further pass the criteria that at least one of the components of the pairs have tmm within the chosen decile.
+Here the pairs are computed using the query ball tree cKDTree algorithm. The chosen pairs have mass ratio of 0.33<m1/m2<3 and redshift difference of < 0.001. This ensures that if the pairs underwent a merger, it must be a major merger. The script selects the pairs that further pass the criteria that at least one of the components of the pairs have a tmm value within the chosen decile.
 
 1. Loading data and defining input parameters
-2. Finding pairs and creating a major/minor sample
-2. Studying merger fraction 𝑓𝑀𝑀 as a function of redshift
+2. Parameters used for creating the Major Merger catalogue
+3. Studying the effect of tmm on MM pairs
 
 Script written by: Soumya Shreeram
 Project supervised by: Johan Comparat
@@ -59,17 +59,11 @@ h = 0.6777
 
 
 """
-2. Parameters for creating the Major Merger catalogue
+2. Parameters used for creating the Major Merger catalogue
 """
 
 # get shell volume and projected radius bins [Mpc]
 r_p, _ = aimm.shellVolume()
-
-# max mass ratio to classify as a major merger [dimensionless]
-mass_max = 3
-
-# defining the redshift bin for a merger (in terms of dv = c*z [km/s])
-dz_cut =  0.001
 
 # keywords can be: 'mm and dv' or 'all' 
 keyword = 'mm and dv'
@@ -78,7 +72,7 @@ keyword = 'mm and dv'
 count_pairs_all_r = np.zeros( (0, len(r_p) ) )
 
 # decile index
-decile_idx = 0
+decile_idx = 1
 
 """
 3. Studying the effect of tmm on MM pairs
@@ -93,7 +87,7 @@ for pixel_no in pixel_no_arr:
     
     print('Pixel: %s, tmm decile: %.1f-%.1f Gyr'%(pixel_no, t_mm_bins[0], t_mm_bins[1]))
     
-    # load the pair indicies and tmm
+    # load the pair indicies
     pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no)  
     
     # go over every radius bin to choose pairs within the decile bin
@@ -110,4 +104,4 @@ for pixel_no in pixel_no_arr:
     count_pairs_all_r = np.append(count_pairs_all_r, [count_pairs_t_mm_arr], axis=0)
     
 # saves the counts (for all chosen pixels and all radii)
-np.save('Data/pairs_z%.1f/Major_dv_pairs/num_pairs_pixel%s-%s_tmm_decile%d.npy'%( pixel_no_arr[0], pixel_no_arr[-1], decile_idx) )
+np.save('Data/pairs_z%.1f/Major_dv_pairs/num_pairs_pixel%s-%s_tmm_decile%d.npy'%(redshift_limit, pixel_no_arr[0], pixel_no_arr[-1], decile_idx) , count_pairs_all_r, allow_pickle=True)
