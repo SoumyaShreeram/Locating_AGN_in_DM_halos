@@ -160,7 +160,7 @@ def allPixelNames():
     
     pixel_no_big_arr = np.array([genPixelArr(ll=0, ul=10), genPixelArr(ll=10, ul=100), hundreds,  genPixelArr(ll=700, ul=768)], dtype=object)
     pixel_no_big_arr_concat = np.concatenate(pixel_no_big_arr, axis=None)
-    return pixel_no_big_arr_concat, pixel_no_big_arr
+    return pixel_no_big_arr_concat
 
 def getHaloLengths(redshift_limit=2):
     halo_lengths = []

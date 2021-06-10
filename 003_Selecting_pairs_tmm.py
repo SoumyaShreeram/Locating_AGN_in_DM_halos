@@ -72,7 +72,7 @@ keyword = 'mm and dv'
 count_pairs_all_r = np.zeros( (0, len(r_p) ) )
 
 # decile index
-decile_idx = 1
+decile_idx = 9
 
 """
 3. Studying the effect of tmm on MM pairs

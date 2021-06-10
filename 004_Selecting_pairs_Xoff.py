@@ -51,7 +51,7 @@ import plotting_cswl05 as pt
 redshift_limit = 2
 
 # pixel numbers chosen for computation from the all-sky simulation file
-number = np.arange(0, 10)
+number = np.arange(0,10)
 pixel_no_arr = ['00000'+ str(n) for n in number]
 
 # Define cosmology used in the notebook
@@ -71,7 +71,7 @@ keyword = 'mm and dv'
 count_pairs_all_r = np.zeros( (0, len(r_p) ) )
 
 # decile index
-decile_idx = 3
+decile_idx = 9
 
 
 """
