@@ -102,7 +102,7 @@ def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3, keyw
     return all_mm_idx, count_major_mergers
 
 
-def openPairsFiles(key = 'mm and dv', data_dir = 'Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, pixel_no='000000'):
+def openPairsFiles(key = 'mm and dv', data_dir = '../Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, pixel_no='000000'):
     """
     Function to open all the files with 
     """
@@ -116,35 +116,26 @@ def openPairsFiles(key = 'mm and dv', data_dir = 'Data/pairs_z2.0/', redshift_li
     pairs_idx = np.load(data_dir+filename, allow_pickle=True)
     return pairs_idx
 
-def getSnapshotZ(hd_z_halo):
+
+def getSnapZ(hd_z_halo):
     """
     Function gets the z and a value at the snapshot of the UNIT simulation for all the input halos
     """
     # load the file that has the information about the snapshots
-    fname = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS', 'fixedAmp_InvPhase_001', 'snapshot_redshift_list.txt')
+    fname = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS', 'fixedAmp_InvPhase_001', 'snap_list_with_border.txt')
     shell_redshifts = np.loadtxt(fname)
+
+    # reads of the shell z, and min/max distance of a shell and a from the file
+    Z_snap  = np.array([i[1] for i in shell_redshifts])
+    DC_max = [i[3] for i in shell_redshifts]
+    DC_min = [i[4] for i in shell_redshifts]
     
-    # reads of the shell z and a from the file
-    shell_z = [i[1] for i in shell_redshifts]
-    shell_a = [i[2] for i in shell_redshifts]
+    dis = np.sqrt(hd_z_halo['HALO_x']**2 + hd_z_halo['HALO_y']**2 + hd_z_halo['HALO_z']**2)
     
-    # reframe the array as a tuple array with upper and lower limits of the shell
-    shell_z_edges = np.array([[shell_z[i+1], shell_z[i]] for i in range(len(shell_z)-1)])
-    shell_z_edges = np.transpose(shell_z_edges)
-    
-    shell_a_edges = np.array([[shell_a[i+1], shell_a[i]] for i in range(len(shell_a)-1)])
-    shell_a_edges = np.transpose(shell_a_edges)
-    
-    # scale of last mm for all the input halos
-    a = hd_z_halo['HALO_scale_of_last_MM']
-    
-    # convert the halo redshifts into snapshot redshifts
-    zsnap_halo, asnap_halo = [], []
-    for i, z in enumerate(hd_z_halo['redshift_R']):
-        # get the upper shell edge
-        zsnap_halo.append(shell_z_edges[0][(shell_z_edges[0] <= z) & (z <= shell_z_edges[1])][0])
-        asnap_halo.append(shell_a_edges[1][(shell_a_edges[0] >= a[i]) & (a[i] >= shell_a_edges[1])][0])
-    return zsnap_halo, asnap_halo
+    zsnap_halo = []
+    for d in dis:
+        zsnap_halo.append(Z_snap[(DC_min <= d) & (d <= DC_max)][0])
+    return zsnap_halo
 
 def calTmm(cosmo, asnap_halo, zsnap_halo):
     """
@@ -208,9 +199,9 @@ def concatAllTmmFiles(dt_m_arr, key, redshift_limit=2, param='t_mm'):
     n_pairs_t_mm_all = np.zeros( (0, len(r_p) ) )
     
     if key == 'mm and dv':
-        data_dir = 'Data/pairs_z%.1f/Major_dv_pairs/'%redshift_limit
+        data_dir = '../Data/pairs_z%.1f/Major_dv_pairs/'%redshift_limit
     if key == 'all':
-        data_dir = 'Data/pairs_z%.1f/'%redshift_limit    
+        data_dir = '../Data/pairs_z%.1f/'%redshift_limit    
         
     for dt_m in dt_m_arr:
         if param == 't_mm':
@@ -340,19 +331,19 @@ def meanZ(pairs, z_arr):
 def decideWhereToSaveControlPairs(count_mz_matched_pairs, r, key = 'pairs', redshift_limit =2, dt_m_bins = [0.5, 1.0]):
     "Function decides where to save the control pairs"
     if key == 'pairs':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
     
     if key == 'selection':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/Controls/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
     
     if key == 'self_pairs':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Controls/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Controls/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, r), count_mz_matched_pairs, allow_pickle=True)
         
     if key == 'tmm_pairs':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
         
     if key == 'tmm_self_pairs':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Tmm_%.2f-%.2fGyr/Controls_mztmm/self_control_pairs_idx_r%.1f_mzTmm.npy'%(redshift_limit, dt_m_bins[0], dt_m_bins[1],r), count_mz_matched_pairs, allow_pickle=True)
     return
 
 
@@ -363,7 +354,7 @@ def getMZmatchedPairs(hd_halo, pairs_all, pairs_selected, r, mr_min = 0.15, mr_m
     m_arr, z_arr = hd_halo['galaxy_SMHMR_mass'], hd_halo['redshift_R']
     
     if param == 't_mm':
-        param_arr =  np.load('Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
+        param_arr =  np.load('../Data/diff_t_mm_arr_z%.1f.npy'%(redshift_limit), allow_pickle=True)
         step_param = 0.02 # Gyr
     #else:
         # neet to figure it out for xoff
@@ -474,12 +465,12 @@ def getMassRatioMeanZpairs(hd_z_halo, pairs_all, r_p, generate_mz_mat = True, bi
             mass_mat_2d[:, r] = counts_m_arr
             z_mat_2d[:, r] = counts_z_arr
 
-        np.save('Data/mz_mat_%s.npy'%param, np.array([mass_mat_2d, z_mat_2d], dtype=object),allow_pickle=True)
-        np.save('Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), pairs_idx_all, allow_pickle=True)
+        np.save('../Data/mz_mat_%s.npy'%param, np.array([mass_mat_2d, z_mat_2d], dtype=object),allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), pairs_idx_all, allow_pickle=True)
         mz_mat = np.array([mass_mat_2d, z_mat_2d], dtype=object)
     else:
-        mz_mat = np.load('Data/mz_mat.npy',allow_pickle=True)
-        pairs_idx_all = np.load('Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), allow_pickle=True)
+        mz_mat = np.load('../Data/mz_mat.npy',allow_pickle=True)
+        pairs_idx_all = np.load('../Data/pairs_z%.1f/chosen_idx_%s.npy'%(redshift_limit, param), allow_pickle=True)
     return mz_mat, pairs_idx_all
 
 def convertPairIdxIntoHaloIdx(pairs):
@@ -513,9 +504,16 @@ def gaussianKde2D(a, b):
 
 
 def selectionHalos(hd_z_halo, diff_t_mm_arr,  xoff_min=0.2, xoff_max=0.3, tmm_min=1, tmm_max=3):
-    xoff_condition = (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] > xoff_min) & (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] < xoff_max)
-    tmm_condition = ( diff_t_mm_arr >  tmm_min ) & (diff_t_mm_arr <  tmm_max )
-
+    """
+    Function to select halos that pass the tmm/xoff criteria or both
+    """
+    if xoff_max is not None:
+        xoff_condition = (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] > xoff_min) & (hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir'] < xoff_max)
+    
+    if tmm_max is not None:
+        tmm_condition = ( diff_t_mm_arr >  tmm_min ) & (diff_t_mm_arr <  tmm_max )
+    
+    
     total_conditions = xoff_condition & tmm_condition
     return total_conditions
 
@@ -524,24 +522,24 @@ def saveSeparationIndicies(all_idx, r, keyword='all', redshift_limit=2, mass_max
     Function to decide where to save the separation indicies
     """
     if keyword == 'mm':
-            np.save('Data/pairs_z%.1f/Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(redshift_limit, r, mass_max), all_idx, allow_pickle=True)
+            np.save('../Data/pairs_z%.1f/Major_pairs/pairs_idx_r%.3f_mm%d.npy'%(redshift_limit, r, mass_max), all_idx, allow_pickle=True)
             print('\n --- Saved mm and dv file --- ')
          
     if keyword == 'mm and dv':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/p_id_pixel%s_mm%d_dz%.3f.npy'%(redshift_limit, pixel_no, mass_max, dz_cut), all_idx, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/p_id_pixel%s_mm%d_dz%.3f.npy'%(redshift_limit, pixel_no, mass_max, dz_cut), all_idx, allow_pickle=True)
         print('\n --- Saved mm and dv file --- ')
 
     if keyword == 'dv':
-        np.save('Data/pairs_z%.1f/dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(redshift_limit, r, dz_cut), all_idx, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/dv_pairs/pairs_idx_r%0.3f_dz%.3f.npy'%(redshift_limit, r, dz_cut), all_idx, allow_pickle=True)
         print('\n --- Saved dv file --- ')
 
     # if you want to save all the pairs
     if keyword == 'all':
-        np.save('Data/pairs_z%.1f/pairs_idx_r%0.3f.npy'%(redshift_limit, r), all_idx, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/pairs_idx_r%0.3f.npy'%(redshift_limit, r), all_idx, allow_pickle=True)
         print('\n --- Saved no cuts file --- ')
         
     if keyword == 'selection':
-        np.save('Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
+        np.save('../Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/pairs_idx_r%.3f_mm%d_dz%.3f.npy'%(redshift_limit, r, mass_max, dz_cut), all_idx, allow_pickle=True)
         print('\n --- Saved mm and dv selected files --- ')
     return
 
@@ -558,5 +556,5 @@ def getPlotModel(pairs_all, hd_z_halo, diff_t_mm_arr, vol, xoff_min=0.17, xoff_m
     fig, ax = plt.subplots(3,1,figsize=(5,14))
     model = pt.plotModelResults(ax, hd_z_halo, pairs_all, pairs_selected, vol)
 
-    np.save('Data/pairs_z%.1f/prediction_xoff%.2f-%.2f_tmm%.1f-%.1fGyr.npy'%(redshift_limit, xoff_min, xoff_max, tmm_min, tmm_max), np.array(model), allow_pickle=True)
+    np.save('../Data/pairs_z%.1f/prediction_xoff%.2f-%.2f_tmm%.1f-%.1fGyr.npy'%(redshift_limit, xoff_min, xoff_max, tmm_min, tmm_max), np.array(model), allow_pickle=True)
     return 

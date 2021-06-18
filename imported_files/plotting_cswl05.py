@@ -127,7 +127,7 @@ def plotNpSep(ax, hd_z_halo, pairs_all, color, label, mec, errorbars = True):
         ax.errorbar(r_p_kpc , np.array(n_pairs), yerr=n_pairs_err, ecolor=mec, fmt='none', capsize=4.5)
     return ax, n_pairs, n_pairs_err
 
-def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_dv_all, pairs_selected_all):
+def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_dv_all, pairs_selected_all, plot_selected_pairs=True):
     """
     Function to plot the fractional number density of pairs for different selection criteria
     """
@@ -137,10 +137,12 @@ def plotFracNdensityPairs(hd_z_halo, pairs_all, pairs_mm_dv_all, pairs_selected_
 
     # plotting the 4 cases with the 4 different cuts
     ax, n_pairs, n_pairs_err = plotNpSep(ax, hd_z_halo, pairs_all[1], 'k', r' $\mathbf{\Gamma}_{m;\  \Delta v;\ t_{\rm MM};\  \tilde{X}_{\rm off}}(r)\ $', mec[0]) 
-    #ax, n_mm_pairs, n_pairs_mm_err = plotNpSep(ax, hd_z_halo, pairs_mm_all[1], flare[1], r'Mass ratio 3:1', mec[2])
+    
     ax, n_mm_dv_pairs, n_pairs_mm_dv_err = plotNpSep(ax, hd_z_halo, pairs_mm_dv_all[1], flare[3], r'$\mathbf{\Gamma}_{t_{\rm MM};\  \tilde{X}_{\rm off}}(r|\ m;\  \Delta v)$', mec[3])
-    ax, n_selected_pairs, n_selected_err = plotNpSep(ax, hd_z_halo, pairs_selected_all[1], flare[2], r'$\mathbf{\Gamma}(r|\ m;\  \Delta v;\ t_{\rm MM};\  \tilde{X}_{\rm off} )$'+'\n'+r'$t_{\rm MM} \in [0.6-1.2]$ Gyr, $\tilde{X}_{\rm off} \in [0.17, 0.54]$', mec[1])
-    #ax, n_mz_control_pairs, n_mz_control_err = plotNpSep(ax, hd_z_halo, num_mm_control_pairs, flare[4],  r'$M^*, z$ control sample', mec[3])
+    
+    if plot_selected_pairs:
+        ax, n_selected_pairs, n_selected_err = plotNpSep(ax, hd_z_halo, pairs_selected_all[1], flare[2], r'$\mathbf{\Gamma}(r|\ m;\  \Delta v;\ t_{\rm MM};\  \tilde{X}_{\rm off} )$'+'\n'+r'$t_{\rm MM} \in [0.6-1.2]$ Gyr, $\tilde{X}_{\rm off} \in [0.17, 0.54]$', mec[1])
+    
 
     ax.set_yscale("log")
     setLabel(ax, r'Separation, $r$ [kpc]', r'$\mathbf{\Gamma}(r)$ [Mpc$^{-3}$]', '', 'default', 'default', legend=False)
@@ -196,7 +198,7 @@ def plotParameterDistributions(xoff_all, string=r'$\tilde{X}_{\rm off}$', xmax=5
     ax.plot(np.sort(xoff_all), pdf_xoff, 'k-', label=r'PDF of '+string)
     
     setLabel(ax, string, 'Distribution of '+string,  '', [np.min(xoff_all), xmax], 'default', legend=True)
-    plt.savefig('figures/'+filestring+'_function.png', facecolor='w', edgecolor='w', bbox_inches='tight')
+    plt.savefig('../figures/'+filestring+'_function.png', facecolor='w', edgecolor='w', bbox_inches='tight')
     return ax
 
 def axId(i):
@@ -212,7 +214,7 @@ def plotPdf(ax, arr, string, color):
     return
 
 def saveFig(filename):
-    plt.savefig('figures/'+filename, facecolor='w', edgecolor='w', bbox_inches='tight')
+    plt.savefig('../figures/'+filename, facecolor='w', edgecolor='w', bbox_inches='tight')
     return
 
 def plotContour(u_pix, matrix_2D, xmin=10, xmax=150, ymin=0, ymax=2, ax=None, cmap='YlGnBu'):

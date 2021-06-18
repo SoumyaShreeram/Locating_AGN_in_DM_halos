@@ -199,5 +199,5 @@ def plotAllLiteraturePlots(Satyapal_14, r_p_err_S14, f_agn_err_S14, r_p_L12, f_a
     ax, Ellison_11_all = plotEllison(ax, r_p_E11, f_agn_E11, r_p_err_E11, f_agn_err_E11, color_E11)
     
     setLabel(ax, r'Projected separation, $r_{\rm p}$ [kpc]', r'Fraction of AGNs, $f_{\rm AGN}$', xlim=[0, xmax], ylim=[0, ymax])
-    plt.savefig('figures/close_p_lit_combined.pdf', facecolor='w', edgecolor='w', bbox_inches='tight')
+    plt.savefig('../figures/close_p_lit_combined.pdf', facecolor='w', edgecolor='w', bbox_inches='tight')
     return ax, np.array([Satyapal_14_all, Liu_12_all, Silverman_11_all, Ellison_11_all], dtype=object)

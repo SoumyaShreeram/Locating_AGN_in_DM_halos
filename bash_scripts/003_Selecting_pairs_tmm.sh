@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cd ../python_scripts
+
+nohup python3 003_Selecting_pairs_tmm.py 0 10 9 > ../log_files/tmm_counts_dec9_px_0-10.log &
+nohup python3 003_Selecting_pairs_tmm.py 10 100 9 > ../log_files/tmm_counts_dec9_px_10-100.log &
+nohup python3 003_Selecting_pairs_tmm.py 100 200 9 > ../log_files/tmm_counts_dec9_px_100-200.log &
+nohup python3 003_Selecting_pairs_tmm.py 200 300 9 > ../log_files/tmm_counts_dec9_px_200-300.log &
+nohup python3 003_Selecting_pairs_tmm.py 300 400 9 > ../log_files/tmm_counts_dec9_px_300-400.log &
+nohup python3 003_Selecting_pairs_tmm.py 400 500 9 > ../log_files/tmm_counts_dec9_px_400-500.log &
+nohup python3 003_Selecting_pairs_tmm.py 500 600 9 > ../log_files/tmm_counts_dec9_px_500-600.log &
+nohup python3 003_Selecting_pairs_tmm.py 600 700 9 > ../log_files/tmm_counts_dec9_px_600-700.log &
+nohup python3 003_Selecting_pairs_tmm.py 700 767 9 > ../log_files/tmm_counts_dec9_px_700-767.log &
+
