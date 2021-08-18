@@ -2,8 +2,8 @@
 
 cd ../python_scripts
 
-nohup python3 003_Selecting_pairs_tmm.py 0 10 9 > ../log_files/tmm_counts_dec9_px_0-10.log &
-nohup python3 003_Selecting_pairs_tmm.py 10 100 9 > ../log_files/tmm_counts_dec9_px_10-100.log &
+nohup python3 003_Selecting_pairs_tmm.py 0 10    9 > ../log_files/tmm_counts_dec9_px_000-010.log &
+nohup python3 003_Selecting_pairs_tmm.py 10 100  9 > ../log_files/tmm_counts_dec9_px_010-100.log &
 nohup python3 003_Selecting_pairs_tmm.py 100 200 9 > ../log_files/tmm_counts_dec9_px_100-200.log &
 nohup python3 003_Selecting_pairs_tmm.py 200 300 9 > ../log_files/tmm_counts_dec9_px_200-300.log &
 nohup python3 003_Selecting_pairs_tmm.py 300 400 9 > ../log_files/tmm_counts_dec9_px_300-400.log &

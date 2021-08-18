@@ -38,21 +38,24 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Load the imported file(s) that contains all the functions used in this notebooks
-sys.path.append('imported_files/')
+sys.path.append('../imported_files/')
 import Exploring_DM_Halos as edh
 import Agn_incidence_from_Major_Mergers as aimm
 import Comparison_simulation_with_literature_data as cswl
 import plotting_cswl05 as pt
+import All_sky as sky
+
 
 """
 1. Defining input parameters
 """
 # look back into redshifts until...
-redshift_limit = 2
+redshift_limit = 1
 
-# pixel numbers chosen for computation from the all-sky simulation file
-number = np.arange(0,10)
-pixel_no_arr = ['00000'+ str(n) for n in number]
+# pixel number from the simulation file
+ll, ul = int(sys.argv[1]), int(sys.argv[2])
+pixel_no_cont_arr = sky.allPixelNames()
+pixel_no_arr = pixel_no_cont_arr[ll:ul]
 
 # Define cosmology used in the notebook
 cosmo = FlatLambdaCDM(H0=67.77*u.km/u.s/u.Mpc, Om0=0.307115)
@@ -71,7 +74,7 @@ keyword = 'mm and dv'
 count_pairs_all_r = np.zeros( (0, len(r_p) ) )
 
 # decile index
-decile_idx = 9
+decile_idx = int(sys.argv[3])
 
 
 """
@@ -88,7 +91,7 @@ for pixel_no in pixel_no_arr:
     xoff_all = hd_z_halo['HALO_Xoff']/hd_z_halo['HALO_Rvir']
     xoff_deciles = cswl.generateDeciles(xoff_all)
     xoff_bins = xoff_deciles[decile_idx]
-    
+    print(xoff_deciles, xoff_bins)
     print("Pixel: %s, Halos: %d, xoff decile: %.2f - %.2f"%( pixel_no, len(hd_z_halo), xoff_bins[0], xoff_bins[1] ))
 
     """
@@ -96,7 +99,7 @@ for pixel_no in pixel_no_arr:
     """
     
     # load the pair indicies
-    pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no)  
+    pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no, redshift_limit = redshift_limit)  
     
     # go over every radius bin to choose pairs within the decile bin
     count_pairs_x_off_arr = []

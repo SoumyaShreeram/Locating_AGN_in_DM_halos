@@ -10,7 +10,7 @@ Date created: 2nd April 2020
 # astropy modules
 import astropy.units as u
 import astropy.io.fits as fits
-from astropy.table import Table, Column
+from astropy.table import Table, Column, join
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import FlatLambdaCDM, z_at_value
 
@@ -42,6 +42,7 @@ import seaborn as sns
 import Exploring_DM_Halos as edh
 import Agn_incidence_from_Major_Mergers as aimm
 import plotting_aimm02 as pt
+import Scaling_relations as sr
 """
 
 Functions begin
@@ -164,8 +165,8 @@ def allPixelNames():
 
 def getHaloLengths(redshift_limit=2):
     halo_lengths = []
-    pixel_arr, _ = allPixelNames()
-    for px in pixel_arr[0:10]:
+    pixel_arr = allPixelNames()
+    for px in pixel_arr:
         print(px)
         _, hd_halo, _ = edh.getHeaders(px, np.array(['halo']))
         # halos
@@ -174,5 +175,67 @@ def getHaloLengths(redshift_limit=2):
         hd_z_halo = hd_halo[conditions_halo]
         
         halo_lengths.append( len(hd_z_halo) )
-    np.save('Data/all_sky_halo_lengths_z%.1f.npy'%redshift_limit, halo_lengths, allow_pickle=True)
+    np.save('../Data/all_sky_halo_lengths_z%.1f.npy'%redshift_limit, halo_lengths, allow_pickle=True)
     return 
+
+def getAgnLengths(redshift_limit=2, frac_cp_agn=0.03):
+    halo_lengths = np.zeros((0, 2))
+    pixel_arr = allPixelNames()
+    for px in pixel_arr:
+        print(px)
+        hd_agn, _, _ = edh.getHeaders(px, np.array(['agn']))
+        hd_agn = hd_agn[hd_agn['redshift_R']<redshift_limit]
+        
+        catAGN = sr.readCatFile(dir_name='CP_10_sigma_1.0_frac_%.2f'%frac_cp_agn, pixel_file=px+'.fit')
+        hd_cp_agn = Table.read(catAGN, format='fits')
+        hd_cp_agn = hd_cp_agn[hd_cp_agn['redshift_R']< redshift_limit]
+        
+        hd_cp_agn_all = join(hd_agn, hd_cp_agn, join_type='outer')
+
+        halo_lengths = np.append(halo_lengths, [[len(hd_agn), len(hd_cp_agn_all)]], axis=0 )
+    np.save('../Data/all_sky_agn_lengths_z%.1f_fracCP_%.2f.npy'%(redshift_limit, frac_cp_agn), halo_lengths, allow_pickle=True)
+    print('saved file :)')
+    return
+
+def makeClusterFile(redshift_limit=2, model_name='Model_A0', using_cp_catAGN=True):
+    "Function concats all the cluster files before redshift_limit"
+    pixel_arr = allPixelNames()
+    hd_clu_params = sr.getCluParams('000000')
+    cluster_Lx_fr500c_w_agn = sr.readTableLxM500c('000000', model_name=model_name, using_cp_catAGN=using_cp_catAGN)
+    data = [cluster_Lx_fr500c_w_agn.columns[0], cluster_Lx_fr500c_w_agn.columns[1], cluster_Lx_fr500c_w_agn.columns[2]]
+    hd_clu_params.add_columns(data, names=cluster_Lx_fr500c_w_agn.colnames)
+
+    for px in pixel_arr[1:-1]:
+        hd_clu_params_new = sr.getCluParams(px,redshift_limit=redshift_limit)
+        
+        cluster_Lx_fr500c_w_agn_new = sr.readTableLxM500c(px, model_name=model_name, using_cp_catAGN=using_cp_catAGN)
+        data = [cluster_Lx_fr500c_w_agn_new.columns[0], cluster_Lx_fr500c_w_agn_new.columns[1], cluster_Lx_fr500c_w_agn_new.columns[2]]
+        hd_clu_params_new.add_columns(data, names=cluster_Lx_fr500c_w_agn_new.colnames)
+        
+        # join tables
+        hd_clu_params = join(hd_clu_params, hd_clu_params_new, join_type='outer')
+    return hd_clu_params
+
+
+def clusterFileAllSky(redshift_limit=2):
+    filename = os.path.join('/data24s', 'comparat', 'simulation', 'UNIT', 'ROCKSTAR_HALOS',\
+                        'fixedAmp_InvPhase_001',\
+                        'UNIT_fA1i_DIR_eRO_CLU_b8_CM_0_pixS_20.0_M500c_13.0_FX_-14.5.fits')
+    hd_clu_params = Table.read(filename, format='fits')
+    hd_clu_params = hd_clu_params[hd_clu_params['redshift_R']<redshift_limit]
+    return hd_clu_params
+
+
+
+
+def write2Table(frac_r500c_arr, scaled_LX_soft_RF_agn_all, pixel_no='000000', using_cp_catAGN=False, redshift_limit=2):
+    "Function to write the data into a fits table using astropy"
+    names = ['f_AGN_(%.1f-%.1f)R_500c'%(frac_r500c_arr[i], frac_r500c_arr[i+1]) for i in range(len(scaled_LX_soft_RF_agn_all[0]))]
+    data = [scaled_LX_soft_RF_agn_all[names[i]] for i in range(len(scaled_LX_soft_RF_agn_all[0]))]
+    t = Table(data, names=names)
+    
+    if using_cp_catAGN:
+        t.write('../Data/pairs_z%.1f/Scaling_relations/CLU_LX_RF_scaled_%s_catAGN_all_px.fit'%(redshift_limit, 'cp'), format='fits')
+    else:
+        t.write('../Data/pairs_z%.1f/Scaling_relations/CLU_LX_RF_scaled_catAGN_all_px.fit'%(redshift_limit), format='fits')
+    return

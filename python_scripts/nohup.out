@@ -1,0 +1,5 @@
+[I 08:55:34.578 NotebookApp] Serving notebooks from local directory: /data26s/shreeram/Locating_AGN_in_DM_halos/python_scripts
+[I 08:55:34.578 NotebookApp] Jupyter Notebook 6.2.0 is running at:
+[I 08:55:34.578 NotebookApp] http://localhost:9980/
+[I 08:55:34.578 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[I 08:55:59.328 NotebookApp] 302 GET / (127.0.0.1) 0.500000ms

@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 # personal imports
 import Agn_incidence_from_Major_Mergers as aimm
 import plotting_cswl05 as pt
-
+import All_sky as sky
 
 def countSelectedPairs(all_selected_idx, print_msg = True, string = 'Major merger cut: '):
     """
@@ -102,10 +102,12 @@ def majorMergerSelection(hd_halo, pairs_idx, mass_min = 0.33, mass_max = 3, keyw
     return all_mm_idx, count_major_mergers
 
 
-def openPairsFiles(key = 'mm and dv', data_dir = '../Data/pairs_z2.0/', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, pixel_no='000000'):
+def openPairsFiles(key = 'mm and dv', redshift_limit = 2, mass_max = 3, dz_cut = 0.001, pixel_no='000000'):
     """
     Function to open all the files with 
     """
+    data_dir = '../Data/pairs_z%.1f/'%redshift_limit
+    
     # get shell volume and projected radius bins
     r_p, shell_volume = aimm.shellVolume()
     pairs_idx_all, n_pairs_arr = [], []
@@ -243,21 +245,6 @@ def nPairsToFracPairs(hd_obj, all_pairs_vs_rp, redshift_limit = 2):
     f_pairs = num_pairs/(N*shell_volume[:len(num_pairs)])
     return f_pairs, error(num_pairs)/(N*shell_volume[:len(num_pairs)])
 
-def Gamma(num_pairs, n):
-    """
-    Function to convert the number of pairs into a fractional number density per shell
-    @redshift_limit :: the initial redshift limit set on the sample (needed for opening dir)
-    """
-    # get shell volume and projected radius bins
-    r_p, shell_volume = aimm.shellVolume()
-    
-    # normalization
-    total_pairs = np.sum( n*(n - 1)/2 )
-    
-    # number density
-    Gamma = num_pairs/(total_pairs*shell_volume)
-    error_Gamma = error(num_pairs)/(total_pairs*shell_volume)
-    return Gamma, error_Gamma 
 
 def getAllMMscales(hd_obj, pairs_mm_all, r_p):
     "Function to get the scale of last MM of all the pairs for all radius"
@@ -558,3 +545,116 @@ def getPlotModel(pairs_all, hd_z_halo, diff_t_mm_arr, vol, xoff_min=0.17, xoff_m
 
     np.save('../Data/pairs_z%.1f/prediction_xoff%.2f-%.2f_tmm%.1f-%.1fGyr.npy'%(redshift_limit, xoff_min, xoff_max, tmm_min, tmm_max), np.array(model), allow_pickle=True)
     return 
+
+def getFracAndStd(gamma_tmm_deciles, gamma_all, t):
+    frac_mean = gamma_tmm_deciles[t, :, 0]/gamma_all[0]
+    frac_std = frac_mean*np.sqrt((gamma_tmm_deciles[t, 0, :]/gamma_tmm_deciles[t, :, 0])**2+(gamma_all[1]/gamma_all[0])**2)
+    return frac_mean, frac_std
+
+def chooseDeciles(gamma_deciles, gamma_all, bins_arr, dec=np.arange(10), key='tmm', redshift_limit=1):
+    """
+    Function to choose the required deciles and save the file accordingly
+    """
+    data, names = [], []
+    # converting the pair counts into a number density
+    for d in dec:
+        frac, frac_std = getFracAndStd(gamma_deciles, gamma_all, d)
+        data.append(frac)
+        data.append(frac_std)
+
+        if key=='tmm':
+            label = 'fr_Tmm_dec%d_bin%.1f-%.1fGyr'%(d, bins_arr[d][0], bins_arr[d][1])
+        elif key=='xoff':
+            label= 'fr_xoff_dec%d_bin%.2f-%.2f'%(d, bins_arr[d][0], bins_arr[d][1])
+        
+        err_label = 'std_dec%d'%d
+        names.append([label, err_label])
+    names = np.concatenate(names, axis=None)
+    print(np.array(data).shape, names)
+    
+    t = Table(data, names=names)
+    save_filename = '../Data/pairs_z%.1f/models_%s.fit'%(redshift_limit, key)
+    t.write(save_filename, format='fits', overwrite=True)
+    return
+
+def GammaDenominator(halo_lens, ll, ul, num_sets=1):
+    # get the total number of pairs
+    if num_sets == 1:
+        total_pairs_per_pix_arr = halo_lens[ll: ul+1]*(halo_lens[ll: ul+1]-1)/2
+        total_pairs_per_pix_arr.shape = (len(total_pairs_per_pix_arr), 1)
+    
+    elif num_sets == 2:
+        h_lens = halo_lens[:, 0][ll: ul]
+        agn_lens = halo_lens[1][ll: ul]
+    
+        t_halo_pairs = h_lens*(h_lens-1)/2
+        t_agn_pairs = agn_lens*(agn_lens-1)/2
+        t_agn_halo_pairs = h_lens*agn_lens
+        
+        total_pairs_per_pix_arr = t_agn_halo_pairs + t_halo_pairs #+ t_agn_pairs
+        #total_pairs_per_pix_arr.shape = (len(total_pairs_per_pix_arr), 1)
+    return total_pairs_per_pix_arr
+
+def getGammaPerPixel(pixel_no_arr, halo_lens, filename_end, redshift_limit=2, num_sets=1):
+    "Function to get the number density per pixel to save into a big table"
+    # get shell volume and projected radius bins [Mpc]
+    r_p, shell_volume = aimm.shellVolume()
+    
+    # load number of pairs
+    data_dir = '../Data/pairs_z%.1f/Major_dv_pairs/'%redshift_limit
+    filename_start = 'num_pairs_pixel%s-%s'%(pixel_no_arr[0], pixel_no_arr[-1])
+    filename = data_dir + filename_start + filename_end
+    count_pairs_all_r = np.load(filename, allow_pickle=True)
+    
+    # get the lower and upper limit of the combined file
+    pixel_no_cont_arr = sky.allPixelNames()
+    ll = np.where(pixel_no_arr[0] == pixel_no_cont_arr)[0][0]
+    ul = np.where(pixel_no_arr[-1] == pixel_no_cont_arr)[0][0]
+    
+    # get the total number of pairs
+    total_pairs_per_pix_arr = GammaDenominator(halo_lens, ll, ul, num_sets=num_sets)
+        
+    frac_pairs = count_pairs_all_r/total_pairs_per_pix_arr
+    gamma = frac_pairs[:, 1:]/shell_volume
+    return gamma
+
+
+def getMeanStdGamma(pixel_no_big_arr, halo_lens, filename_end, redshift_limit=2, num_bins=25):
+    "Function to get the mean and std of gamma all the pixels"
+    # get shell volume and projected radius bins [Mpc]
+    r_p, _ = aimm.shellVolume(num_bins=num_bins)
+    
+    gamma_separation = np.zeros( (0, len(r_p)-1) )
+
+    # list of lists over the pixels that were computed at one go
+    for pixel_no_arr in pixel_no_big_arr:   
+        gamma = getGammaPerPixel(pixel_no_arr, halo_lens, filename_end, redshift_limit=redshift_limit)
+        gamma_separation = np.vstack((gamma_separation, gamma))
+    
+    # get mean and sdv of the number density for the decile
+    mean_gamma = [np.mean(gamma_separation[:, i]).value for i in range( len(r_p)-1 )]
+    std_gamma =  [np.std(gamma_separation[:, i]).value for i in range( len(r_p)-1 )]
+    return mean_gamma, std_gamma
+
+def getAllSkyPairs(r_p, pixel_no_cont_arr, redshift_limit=2):
+    #save this info for every run of pixels
+    num_pairs_counts_arr = np.zeros((0, len(r_p) ))
+
+    for pixel_no in pixel_no_cont_arr[:-1]:
+        pairs_idx = np.load('../Data/pairs_z%.1f/Major_dv_pairs/p_id_pixel%s_mm3_dz0.001.npy'%(redshift_limit, pixel_no), allow_pickle=True)
+        r_bin_counts = len(pairs_idx[0])
+
+        num_pairs_arr = []
+        num_pairs_arr.append(r_bin_counts)
+
+        for p in np.arange(1, len(pairs_idx)):
+            # get rid of counts from the previous r-bin
+            num_pairs = len(pairs_idx[p])-r_bin_counts
+            num_pairs_arr.append(num_pairs)
+
+            # updating the counting of the r-bin
+            r_bin_counts = len(pairs_idx[p])
+
+        # saving the number of counts in the current pixel's r-bins
+        num_pairs_counts_arr = np.append(num_pairs_counts_arr, [num_pairs_arr], axis=0)
+    return num_pairs_counts_arr

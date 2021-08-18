@@ -37,7 +37,7 @@ ll, ul = int(sys.argv[1]), int(sys.argv[2])
 1. Defining input parameters
 """
 # look back into redshifts until...
-redshift_limit = 0.2
+redshift_limit = 1
 
 # pixel number from the simulation file
 pixel_no_cont_arr = sky.allPixelNames()

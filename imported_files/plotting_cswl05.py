@@ -40,7 +40,7 @@ import Comparison_simulation_with_literature_data as cswl
 
 from scipy.stats import norm
 
-def setLabel(ax, xlabel, ylabel, title, xlim, ylim, legend=True):
+def setLabel(ax, xlabel, ylabel, title='', xlim='default', ylim='default', legend=True):
     """
     Function defining plot properties
     @param ax :: axes to be held

@@ -52,7 +52,7 @@ import All_sky as sky
 
 
 # look back into redshifts until...
-redshift_limit = 0.2
+redshift_limit = 1
 
 
 # pixel number from the simulation file
@@ -156,13 +156,14 @@ for pixel_no in pixel_no_arr:
             # (3) choose only major pairs (major mergers)
             all_mm_idx, count_pairs = cswl.majorMergerSelection(hd_halo_z, all_idx, keyword=keyword)
 
+        # save file based on the criteria applied
+        pairs_selected = cswl.tuplePairArr(np.array(all_mm_dv_idx))
+            
         if save_indicies:
-            # save file based on the criteria applied
-            pairs_selected = cswl.tuplePairArr(np.array(all_mm_dv_idx))
             all_mm_dv_idx_all.append(pairs_selected)           
 
 
-        count_pairs_arr.append(count_pairs)
+        count_pairs_arr.append(len(pairs_selected))
 
         # decides wether to save the counts of pairs or/and the indicies
         if save_indicies:
@@ -172,4 +173,4 @@ for pixel_no in pixel_no_arr:
     count_pairs_arr2D = np.append(count_pairs_arr2D, [count_pairs_arr], axis=0)
 
     
-np.save('../Data/pairs_z%.1f/Major_dv_pairs/Selection_applied/num_pairs_pixels_%s-%s.npy'%(redshift_limit, pixel_no_arr[0], pixel_no_arr[-1]), count_pairs_arr2D, allow_pickle=True)
+np.save('../Data/pairs_z%.1f/Major_dv_pairs/num_pairs_pixels_%s-%s.npy'%(redshift_limit, pixel_no_arr[0], pixel_no_arr[-1]), count_pairs_arr2D, allow_pickle=True)

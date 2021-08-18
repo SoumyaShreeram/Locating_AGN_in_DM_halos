@@ -48,7 +48,7 @@ import All_sky as sky
 1. Defining input parameters
 """
 # look back into redshifts until...
-redshift_limit = 2
+redshift_limit = 1
 
 # pixel number from the simulation file
 ll, ul = int(sys.argv[1]), int(sys.argv[2])
@@ -90,7 +90,7 @@ for pixel_no in pixel_no_arr:
     print('Pixel: %s, tmm decile: %.1f-%.1f Gyr'%(pixel_no, t_mm_bins[0], t_mm_bins[1]))
     
     # load the pair indicies
-    pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no)  
+    pairs_idx = cswl.openPairsFiles(pixel_no=pixel_no, redshift_limit = redshift_limit)  
     
     # go over every radius bin to choose pairs within the decile bin
     count_pairs_t_mm_arr = []
